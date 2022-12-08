@@ -1,0 +1,4 @@
+/obj
+/bin
+/Runtime/libtashi_platform.*
+/create-package.sh.meta

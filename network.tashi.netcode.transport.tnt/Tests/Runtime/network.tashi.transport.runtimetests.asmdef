@@ -1,0 +1,9 @@
+{
+  "name": "Tnt.RuntimeTests",
+  "references": [
+    "Tashi Network Transport for Netcode for GameObjects"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

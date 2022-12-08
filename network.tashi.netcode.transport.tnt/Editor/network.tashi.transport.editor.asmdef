@@ -1,0 +1,6 @@
+{
+	"name": "Tashi Network Transport Editor",
+	"rootNamespace": "Tashi.Editor",
+	"includePlatforms": ["Editor"],
+	"references":[ "GUID:259b5959d630dae4aaab42ff8840f9b0" ]
+}

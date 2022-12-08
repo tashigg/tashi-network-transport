@@ -1,0 +1,8 @@
+{
+  "name": "network.tashi.netcode.transport.tnt",
+  "version": "0.0.1",
+  "displayName": "Tashi Network Transport for Netcode for GameObjects",
+  "description": "Tashi Network Transport for Netcode for GameObjects",
+  "unity": "2021.3",
+  "testables": ["network.tashi.transport.tnt"]
+}
