@@ -1,0 +1,68 @@
+name: TNT
+
+on:
+  workflow_dispatch:
+    inputs:
+      tce-run:
+        description: The TCE run number to use artifacts from
+        required: true
+      release-version:
+        description: Set this to create a draft release, e.g. '0.0.1'. Do not include the 'v' prefix.
+        required: false
+
+jobs:
+  # TODO: Check formatting, static analysis, run test, etc.
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v2
+
+      - name: Download the TCE native libraries
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          repo: launchbadge/tashi-consensus-engine
+          workflow: ci.yml
+          github_token: ${{ secrets.TCE_WORKFLOW_PAT }}
+          run_number: ${{ github.events.inputs.tnt-run }}
+          name: tce
+          path: dev.tashi.network.transport/Runtime/
+
+      - name: Set the version
+        run: |
+          version=${{ inputs.release-version }}
+          
+          if [[ "$version" == "" ]]; then
+            base_version=$(sed -rn 's/  "version": "(.*)",/\1/p' dev.tashi.network.transport/package.json)
+
+            # This must follow semantic versioning
+            version="${base_version}+$(git rev-parse --short HEAD)"
+          fi
+
+          echo "TNT_VERSION=$version" >> $GITHUB_ENV
+
+      - name: Create the package
+        run: |
+          archive_name=TashiNetworkTransport-UnityPlugin-$TNT_VERSION.zip
+          echo "TNT_ARCHIVE_NAME=$archive_name" >> $GITHUB_ENV
+          sed -i "s/\"version\":.*/\"version\": \"$TNT_VERSION\",/" dev.tashi.network.transport/package.json
+          zip -r $archive_name dev.tashi.network.transport
+
+      # TODO: Include the third party licenses
+      # TODO: Include the Tashi license
+      - name: Upload the TNT artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: tnt
+          path: ${{ env.TNT_ARCHIVE_NAME }}
+
+      - name: Create a draft release
+        if: ${{ inputs.release-version }} != ""
+        uses: ncipollo/release-action@v1
+        with:
+          draft: true
+          artifactErrorsFailBuild: true
+          artifacts: "*.zip"
+          commit: main
+          tag: v${{ inputs.release-version }}
