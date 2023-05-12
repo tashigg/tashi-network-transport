@@ -1,0 +1,5 @@
+# TODO:
+# - Require specifying a build.yml run artifact to use
+# - Require specifying a version to attach the artifacts to
+# - Create an unpublished release
+# - Attach the assets to the release

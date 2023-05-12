@@ -32,3 +32,11 @@ transport.
    * Scroll down in the inspector to the Tashi Network Transport  and set the
      expected number of nodes and the sync interval.
 . `File > Build Settings` and click build.
+
+## Release process
+
+1. Create a TNT build artifact by running the "Build TNT" workflow.
+2. Verify it works as expected.
+3. Run the "Release TNT" workflow, which will create an unpublished GitHub release.
+4. Manually include release notes.
+5. Publish the release.

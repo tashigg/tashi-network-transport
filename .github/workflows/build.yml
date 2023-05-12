@@ -1,0 +1,44 @@
+name: TNT
+
+on:
+  workflow_dispatch:
+    inputs:
+      tce-run:
+        description: The TCE run number to use artifacts from
+        required: true
+  # TODO: Enable setting a release version number for
+
+jobs:
+  # TODO: Check formatting, static analysis, run test, etc.
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the TCE native libraries
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          # TODO: This will need to be updated with the PAT we create
+          workflow: ci.yml
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          run_number: ${{ github.events.inputs.tnt-run }}
+          name: tce
+          path: dev.tashi.network.transport/Runtime/
+
+      - name: Set the version
+        # TODO: Use the value from the release event if it's set
+        run: |
+          base_version=$(sed -rn 's/  "version": "(.*)",/\1/p' dev.tashi.network.transport/package.json)
+
+          # This must follow semantic versioning
+          version="${base_version}+$(git rev-parse --short HEAD)"
+          echo "TNT_VERSION=$version" >> $GITHUB_ENV
+          sed -i "s/\"version\":.*/\"version\": \"$version\",/" dev.tashi.network.transport/package.json
+
+      # TODO: Embed some tce artifact identifier
+      # TODO: Include the third party licenses
+      # TODO: Include the Tashi license
+      - name: Upload the TNT artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: tnt
+          path: TashiNetworkTranspot-UnityPlugin-${{ env.TNT_VERSION }}.zip
