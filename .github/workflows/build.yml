@@ -29,6 +29,16 @@ jobs:
           name: tce
           path: dev.tashi.network.transport/Runtime/
 
+      - name: Download the TCE licenses
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          repo: launchbadge/tashi-consensus-engine
+          workflow: ci.yml
+          github_token: ${{ secrets.TCE_WORKFLOW_PAT }}
+          run_number: ${{ github.events.inputs.tnt-run }}
+          name: licenses
+          path: dev.tashi.network.transport/
+
       - name: Set the version
         run: |
           version=${{ inputs.release-version }}
