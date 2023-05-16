@@ -1,2 +1,5 @@
-*.sln
 *.csproj
+*.dll
+*.dylib
+*.sln
+*.so
