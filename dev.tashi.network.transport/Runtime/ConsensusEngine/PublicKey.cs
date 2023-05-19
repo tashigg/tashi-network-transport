@@ -12,7 +12,14 @@ namespace Tashi.ConsensusEngine
     {
         public const uint DerLength = 91;
 
+        public const int RawBytesLength = 64; 
+
         public byte[] Der { get; }
+
+        /// <summary>
+        ///  Returns the uncompressed raw bytes of the public key (X and Y coordinates concatenated together).
+        /// </summary>
+        public ReadOnlySpan<Byte> RawBytes => new(Der, Der.Length - RawBytesLength, RawBytesLength);
 
         public PublicKey(byte[] der)
         {
