@@ -15,13 +15,13 @@ namespace Tashi.NetworkTransport
     [AddComponentMenu("Netcode/Tashi Network Transport")]
     public class TashiNetworkTransport : Unity.Netcode.NetworkTransport
     {
-        public TashiNetworkTransportConfig Config;
+        public TashiNetworkTransportConfig Config = new();
         public AddressBookEntry AddressBookEntry;
         public PublicKey? HostPublicKey;
 
         public delegate void OnPlatformInitHandler(object sender);
 
-        public event OnPlatformInitHandler OnPlatformInit;
+        public event OnPlatformInitHandler? OnPlatformInit;
 
         private Platform? _platform;
         private SecretKey _secretKey;
@@ -61,6 +61,11 @@ namespace Tashi.NetworkTransport
 
         public override void Send(ulong clientId, ArraySegment<byte> data, NetworkDelivery delivery)
         {
+            if (_platform == null)
+            {
+                throw new InvalidOperationException("_platform is null");
+            }
+
             if (data.Array is null)
             {
                 throw new ArgumentNullException(nameof(data));
@@ -82,6 +87,11 @@ namespace Tashi.NetworkTransport
         // Returns true if an event was received.
         private bool ProcessEvent()
         {
+            if (_platform == null)
+            {
+                throw new InvalidOperationException("_platform is null");
+            }
+
             ConsensusEvent? dataEvent;
 
             try
@@ -301,6 +311,11 @@ namespace Tashi.NetworkTransport
 
         private void StartSyncing()
         {
+            if (_platform == null)
+            {
+                throw new InvalidOperationException("_platform is null");
+            }
+
             Debug.Log($"StartSyncing for client ID {_clientId} on {AddressBookEntry.Address}");
 
             try
