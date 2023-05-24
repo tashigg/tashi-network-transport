@@ -4,29 +4,32 @@ using Tashi.NetworkTransport;
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(TashiNetworkTransport), true)]
-[CanEditMultipleObjects]
-public class TashiNetworkTransportEditor : Editor
+namespace Tashi.NetworkTransport
 {
-    private SerializedProperty m_Config;
-    private SerializedProperty m_TotalNodes;
-    private SerializedProperty m_BindPort;
-    private SerializedProperty m_SyncInterval;
-
-    void OnEnable()
+    [CustomEditor(typeof(TashiNetworkTransport), true)]
+    [CanEditMultipleObjects]
+    public class TashiNetworkTransportEditor : Editor
     {
-        m_Config = serializedObject.FindProperty(nameof(TashiNetworkTransport.Config));
-        m_TotalNodes = m_Config.FindPropertyRelative("TotalNodes");
-        m_SyncInterval = m_Config.FindPropertyRelative("SyncInterval");
-        m_BindPort = m_Config.FindPropertyRelative("BindPort");
-    }
+        private SerializedProperty m_Config;
+        private SerializedProperty m_TotalNodes;
+        private SerializedProperty m_BindPort;
+        private SerializedProperty m_SyncInterval;
 
-    public override void OnInspectorGUI()
-    {
-        serializedObject.Update();
-        EditorGUILayout.PropertyField(m_TotalNodes);
-        EditorGUILayout.PropertyField(m_SyncInterval, new GUIContent("Sync Interval (ms): "));
-        EditorGUILayout.PropertyField(m_BindPort);
-        serializedObject.ApplyModifiedProperties();
+        void OnEnable()
+        {
+            m_Config = serializedObject.FindProperty(nameof(TashiNetworkTransport.Config));
+            m_TotalNodes = m_Config.FindPropertyRelative("TotalNodes");
+            m_SyncInterval = m_Config.FindPropertyRelative("SyncInterval");
+            m_BindPort = m_Config.FindPropertyRelative("BindPort");
+        }
+
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+            EditorGUILayout.PropertyField(m_TotalNodes);
+            EditorGUILayout.PropertyField(m_SyncInterval, new GUIContent("Sync Interval (ms): "));
+            EditorGUILayout.PropertyField(m_BindPort);
+            serializedObject.ApplyModifiedProperties();
+        }
     }
 }

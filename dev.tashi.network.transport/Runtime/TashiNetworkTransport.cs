@@ -15,7 +15,7 @@ namespace Tashi.NetworkTransport
     [AddComponentMenu("Netcode/Tashi Network Transport")]
     public class TashiNetworkTransport : Unity.Netcode.NetworkTransport
     {
-        public TashiNetworkTransportConfig Config = new();
+        public TashiNetworkTransportEditorConfig Config = new();
         public AddressBookEntry AddressBookEntry;
         public PublicKey? HostPublicKey;
 
