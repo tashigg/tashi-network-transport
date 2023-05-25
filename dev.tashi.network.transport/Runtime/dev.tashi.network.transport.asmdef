@@ -1,6 +1,6 @@
 {
     "name": "dev.tashi.network.transport",
-    "rootNamespace": "Tashi",
+    "rootNamespace": "Tashi.NetworkTransport",
     "references": [
         "Unity.Netcode.Runtime"
     ],
