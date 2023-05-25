@@ -68,7 +68,7 @@ jobs:
           path: ${{ env.TNT_ARCHIVE_NAME }}
 
       - name: Create a draft release
-        if: ${{ inputs.release-version }} != ""
+        if: inputs.release-version != ''
         uses: ncipollo/release-action@v1
         with:
           draft: true
