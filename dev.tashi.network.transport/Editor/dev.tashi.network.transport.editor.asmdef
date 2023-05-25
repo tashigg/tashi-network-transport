@@ -1,6 +1,6 @@
 {
 	"name": "Tashi Network Transport Editor",
-	"rootNamespace": "Tashi.Editor",
+	"rootNamespace": "Tashi.NetworkTransport",
 	"includePlatforms": ["Editor"],
 	"references":[ "dev.tashi.network.transport" ]
 }
