@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using Unity.Collections;
+using Unity.Networking.Transport;
+using UnityEngine;
 
 namespace Tashi.ConsensusEngine
 {
@@ -23,15 +26,47 @@ namespace Tashi.ConsensusEngine
         private bool _started;
         private bool _disposed;
 
+        private ulong _clientId;
+
+        // Unity Relay enforces a limit of 1400 bytes per each datagram.
+        private static UIntPtr MaxRelayDataLen = new(1400);
+
         /// <summary>
         /// Create a new platform. It won't begin communicating with other nodes
         /// until the Start method is called.
         /// </summary>
         ///
-        public Platform(NetworkMode mode, UInt16 port, TimeSpan syncInterval, SecretKey secretKey)
+        public Platform(NetworkMode mode, UInt16 port, TimeSpan syncInterval, SecretKey secretKey, ulong clientId)
         {
             _platform = tce_init(
                 mode,
+                null,
+                port,
+                // FIXME: Ensure the conversion can succeed
+                (UInt32)syncInterval.TotalMilliseconds,
+                secretKey.Der,
+                (uint)secretKey.Der.Length,
+                out var result
+            );
+
+            _clientId = clientId;
+
+            if (result != Result.Success)
+            {
+                throw new ArgumentException($"Failed to initialize the platform: {result}");
+            }
+        }
+
+        /// <summary>
+        /// Create a new platform. It won't begin communicating with other nodes
+        /// until the Start method is called.
+        /// </summary>
+        ///
+        public Platform(NetworkMode mode, IPEndPoint bindAddress, UInt16 port, TimeSpan syncInterval, SecretKey secretKey)
+        {
+            _platform = tce_init(
+                mode,
+                bindAddress.ToString(),
                 port,
                 // FIXME: Ensure the conversion can succeed
                 (UInt32)syncInterval.TotalMilliseconds,
@@ -45,7 +80,7 @@ namespace Tashi.ConsensusEngine
                 throw new ArgumentException($"Failed to initialize the platform: {result}");
             }
         }
-
+        
         /// <summary>
         /// If a port wasn't specified, or if port 0 was specified then this
         /// function will help in determining which port was actually used.
@@ -160,6 +195,85 @@ namespace Tashi.ConsensusEngine
             }
         }
 
+        internal (SockAddr addr, byte[] packet)? GetExternalTransmit()
+        {
+            var result = tce_external_transmit_get(_platform, out var transmit);
+
+            if (result != Result.Success)
+            {
+                if (result != Result.TransmitQueueEmpty)
+                {
+                    Debug.Log($"error from tce_external_transmit_get: {result}");
+                }
+                return null;
+            }
+
+            result = tce_external_transmit_get_addr(transmit, out var sockAddr, out var sockAddrLen);
+
+            if (result != Result.Success)
+            {
+                Debug.Log($"error from tce_external_transmit_get_addr: {result}");
+                return null;
+            }
+
+            result = tce_external_transmit_get_packet(transmit, out var packetPtr, out var packetLen);
+
+            if (result != Result.Success)
+            {
+                Debug.Log($"error from tce_external_transmit_get_addr: {result}");
+                return null;
+            }
+
+            var packet = new byte[(int)packetLen];
+                
+            Marshal.Copy(packetPtr, packet, 0, (int) packetLen);
+
+            return (sockAddr, packet);
+        }
+
+        internal void ExternalReceive(SockAddr addr, DataStreamReader stream)
+        {
+            if (!_started)
+            {
+                throw new InvalidOperationException("The platform hasn't been started");
+            }
+
+            var result = tce_external_recv_prepare(_platform, MaxRelayDataLen, out IntPtr buf, out UIntPtr bufLen);
+
+            if (result != Result.Success)
+            {
+                return;
+            }
+
+            // Kind of baffling that this is actually necessary.
+            // It should just take a capacity and return the number of bytes written.
+            var bytesAvailable = stream.Length - stream.GetBytesRead();
+
+            if (bytesAvailable < 8)
+            {
+                Debug.Log("received message shorter than 8 bytes");
+            }
+
+            var clientId = stream.ReadULong();
+
+            var readLen = Math.Min(bytesAvailable - 8, (int) bufLen);
+            
+            unsafe
+            {
+                // SAFETY: `buf` is valid for up to `MaxRelayDataLen`
+                stream.ReadBytes((byte*) buf, readLen);
+            }
+
+            var sockAddr = SockAddr.FromClientId(clientId);
+
+            result = tce_external_recv_commit(_platform, new((uint) readLen), ref sockAddr, sockAddr.Len);
+
+            if (result != Result.Success)
+            {
+                Debug.Log($"error from tce_external_recv_commit: {result}");
+            }
+        }
+
         public void Dispose()
         {
             Dispose(true);
@@ -191,6 +305,7 @@ namespace Tashi.ConsensusEngine
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_init")]
         static extern IntPtr tce_init(
             NetworkMode mode,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string? address,
             UInt16 port,
             UInt32 syncIntervalMilliseconds,
             byte[] publicKeyDer,
@@ -228,6 +343,42 @@ namespace Tashi.ConsensusEngine
             IntPtr platform,
             byte[] data,
             UInt32 len
+        );
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get")]
+        static extern Result tce_external_transmit_get(
+            IntPtr platform,
+            out IntPtr transmitOut
+        );
+        
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_addr")]
+        static extern Result tce_external_transmit_get_addr(
+            IntPtr transmit,
+            out SockAddr addr,
+            out UIntPtr sockAddrLen
+        );
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_packet")]
+        static extern Result tce_external_transmit_get_packet(
+            IntPtr transmit,
+            out IntPtr packetOut,
+            out UIntPtr packetLenOut
+        );
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare")]
+        static extern Result tce_external_recv_prepare(
+            IntPtr platform,
+            UIntPtr bufCapacity,
+            out IntPtr buf,
+            out UIntPtr len
+        );
+        
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_commit")]
+        static extern Result tce_external_recv_commit(
+            IntPtr platform,
+            UIntPtr writtenLen,
+            ref SockAddr sockAddr,
+            UIntPtr sockAddrLen
         );
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_event_free")]

@@ -36,28 +36,15 @@ namespace Tashi.NetworkTransport
 
         private List<PublicKey> _connectedPeers = new();
         
-        private static readonly byte[] ExternalAddressPrefix = {
-            // `fd00:/8` designates this as a locally assigned ULA (unique local address).
-            // `fc00::/8` is reserved for future use.
-            0xfd,
-            // The next 5 bytes are the global ID.
-            // Meant to be random, but this lets us unambiguously identify generated addresses
-            // when we support mixed networking topology.
-            //
-            // It's unlikely for another organization to randomly choose this global ID 
-            // *and* want to use TNT in their network. 
-            (byte) 'T',
-            (byte) 'a',
-            (byte) 's',
-            (byte) 'h',
-            (byte) 'i'
-        };
+
+
+        private ExternalConnectionManager? _externalConnectionManager;
 
         TashiNetworkTransport()
         {
             _secretKey = SecretKey.Generate();
             PublicKey publicKey = _secretKey.GetPublicKey();
-            _clientId = GetClientIdFromPublicKey(publicKey);
+            _clientId = publicKey.ClientId;
         }
 
         // Network transport events must be in terms of seconds since the game
@@ -90,58 +77,6 @@ namespace Tashi.NetworkTransport
             Debug.Log($"Sending a {copied.Length} byte message to {clientId}");
         }
 
-        private static ulong GetClientIdFromPublicKey(PublicKey pk)
-        {
-            // Use the first 8 bytes of the public key, which should be the high bytes of the X coordinate.
-            // The last 32 bytes of the public key is the Y coordinate, which is reduced to a single bit
-            // in the compressed form, as there's only two possible Y coordinates for a given X coordinate.
-
-            // Using this method ensures the generated value is the same regardless of the platform endianness.
-            return BinaryPrimitives.ReadUInt64BigEndian(pk.RawBytes);
-        }
-
-        private static IPEndPoint GetExternalEndpointFromPublicKey(PublicKey pk)
-        {
-            // TCE needs a unique IP address to reference each peer by, but if we're using an external transport
-            // like Unity Relay, the peer may not know their Internet-routable IP address and may only know their
-            // LAN IP, which is likely to collide with those of peers on other LANs.
-            //
-            // Thanks to IPv6's unique local addresses, we can generate a 120-bit address in the `fd00::/8` subnet
-            // and an additional 16-bit port that is _highly_ unlikely to collide unless two peers have the same public
-            // key, in which case the Hashgraph cannot function properly anyway.
-            //
-            // UUIDs are "only" 128 bits, after all.
-            
-            // This implementation assumes the public key is the concatenated X and Y coordinates on the Elliptic curve:
-            // 32 bytes each.
-            Debug.Assert(PublicKey.RawBytesLength == 64);
-
-            // IPv6 unique local address layout: https://en.wikipedia.org/wiki/Unique_local_address#Definition
-            // Prefix (0xfd), Global ID (5 bytes), Subnet ID (2 bytes), Address (8 bytes)
-            var addressBytes = new byte[16];
-
-            var addressBytesSpan = new Span<byte>(addressBytes);
-
-            // Fill the first 6 bytes (block prefix and global ID) of the address with our static prefix.
-            Array.Copy(ExternalAddressPrefix, addressBytes, ExternalAddressPrefix.Length);
-            
-            // Set the address to be our client ID, for consistency.
-            // This should take the first 8 bytes of the raw public key.
-            BinaryPrimitives.WriteUInt64BigEndian(addressBytesSpan[8..], GetClientIdFromPublicKey(pk));
-
-            // Set the subnet ID to be the next two bytes of the public key.
-            // Unlike Rust's `slice::copy_from_slice()`, this only asserts that the destination span is large enough,
-            // instead of requiring it to be exactly the same length.
-            pk.RawBytes[10..12].CopyTo(addressBytesSpan[6..]);
-
-            var address = new IPAddress(addressBytes);
-            
-            // Choose the port from the last two bytes of the X coordinate, for additional entropy.
-            var port = BinaryPrimitives.ReadUInt16BigEndian(pk.RawBytes[62..]);
-
-            return new IPEndPoint(address, port);
-        }
-
         // Returns true if an event was received.
         private bool ProcessEvent()
         {
@@ -168,7 +103,7 @@ namespace Tashi.NetworkTransport
                 return false;
             }
 
-            var creatorId = GetClientIdFromPublicKey(dataEvent.CreatorPublicKey);
+            var creatorId =dataEvent.CreatorPublicKey.ClientId;
             if (creatorId == _clientId)
             {
                 Debug.Log("Ignoring a message that was created by me");
@@ -263,6 +198,8 @@ namespace Tashi.NetworkTransport
             {
                 return NetworkEvent.Nothing;
             }
+            
+            _externalConnectionManager?.Update();
 
             while (ProcessEvent())
             {
@@ -297,7 +234,8 @@ namespace Tashi.NetworkTransport
                 NetworkMode.Local,
                 Config.BindPort,
                 TimeSpan.FromMilliseconds(Config.SyncInterval),
-                _secretKey
+                _secretKey,
+                _secretKey.GetPublicKey().ClientId
             );
 
             // TODO: Also handle ExternalAddressBookEntry. It will be serialized
