@@ -1,6 +1,9 @@
+#nullable enable
+
 using System.Net;
 using Tashi.ConsensusEngine;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace TashiConsensusEngineTests
 {
@@ -9,11 +12,62 @@ namespace TashiConsensusEngineTests
         [Test]
         public void Equals_Works()
         {
-            var ep = new IPEndPoint(123, 123);
             var sk = SecretKey.Generate();
-            var entry1 = new AddressBookEntry(ep, sk.GetPublicKey());
-            var entry2 = new AddressBookEntry(ep, sk.GetPublicKey());
+            var entry1 = new DirectAddressBookEntry(IPAddress.Loopback,  0, sk.GetPublicKey());
+            var entry2 = new DirectAddressBookEntry(IPAddress.Loopback,  0, sk.GetPublicKey());
+            var entry3 = new DirectAddressBookEntry(IPAddress.Broadcast, 0, sk.GetPublicKey());
             Assert.AreEqual(entry1, entry2);
+            Assert.AreNotEqual(entry1, entry3);
+
+            var external1 = new ExternalAddressBookEntry("123", sk.GetPublicKey());
+            var external2 = new ExternalAddressBookEntry("123", sk.GetPublicKey());
+            var external3 = new ExternalAddressBookEntry("456", sk.GetPublicKey());
+            Assert.AreEqual(external1, external2);
+            Assert.AreNotEqual(external1, external3);
+        }
+
+        [Test]
+        public void DirectSerialization_RoundTrip_Works()
+        {
+            var sk = SecretKey.Generate();
+            var expected = new DirectAddressBookEntry(IPAddress.Loopback, 0, sk.GetPublicKey());
+
+            var serialized = expected.Serialize();
+            Debug.Log(serialized);
+
+            var addressBookEntry = AddressBookEntry.Deserialize(serialized);
+            Assert.AreEqual(expected, addressBookEntry);
+
+            if (addressBookEntry is DirectAddressBookEntry actual)
+            {
+                Assert.AreEqual(expected, actual);
+            }
+            else
+            {
+                Assert.Fail("object isn't a DirectAddressBookEntry");
+            }
+        }
+
+        [Test]
+        public void ExternalSerialization_RoundTrip_Works()
+        {
+            var sk = SecretKey.Generate();
+            var expected = new ExternalAddressBookEntry("123", sk.GetPublicKey());
+
+            var serialized = expected.Serialize();
+            Debug.Log(serialized);
+
+            var addressBookEntry = AddressBookEntry.Deserialize(serialized);
+            Assert.AreEqual(expected, addressBookEntry);
+
+            if (addressBookEntry is ExternalAddressBookEntry actual)
+            {
+                Assert.AreEqual(expected, actual);
+            }
+            else
+            {
+                Assert.Fail("object isn't an ExternalAddressBookEntry");
+            }
         }
     }
 }

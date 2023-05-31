@@ -16,7 +16,7 @@ namespace Tashi.NetworkTransport
     public class TashiNetworkTransport : Unity.Netcode.NetworkTransport
     {
         public TashiNetworkTransportEditorConfig Config = new();
-        public AddressBookEntry AddressBookEntry;
+        public AddressBookEntry? AddressBookEntry;
         public PublicKey? HostPublicKey;
 
         public delegate void OnPlatformInitHandler(object sender);
@@ -39,13 +39,6 @@ namespace Tashi.NetworkTransport
         {
             _secretKey = SecretKey.Generate();
             PublicKey publicKey = _secretKey.GetPublicKey();
-
-            AddressBookEntry = new AddressBookEntry
-            {
-                Address = null,
-                PublicKey = publicKey,
-            };
-
             _clientId = GetClientIdFromPublicKey(publicKey);
         }
 
@@ -242,9 +235,11 @@ namespace Tashi.NetworkTransport
                 _secretKey
             );
 
-            AddressBookEntry.Address = _platform.GetBoundAddress();
-
-            Debug.Log($"Listening on {AddressBookEntry.Address}");
+            // TODO: Also handle ExternalAddressBookEntry. It will be serialized
+            // and sent to the lobby k/v store when `OnPlatformInit?.Invoke(this)` is called
+            var direct = new DirectAddressBookEntry(_platform.GetBoundAddress(), _secretKey.GetPublicKey());
+            AddressBookEntry = direct;
+            Debug.Log($"Listening on {direct.Address}");
 
             AddAddressBookEntry(AddressBookEntry);
 
@@ -284,14 +279,9 @@ namespace Tashi.NetworkTransport
 
         public void AddAddressBookEntry(AddressBookEntry entry)
         {
-            if (entry.PublicKey is null || entry.Address is null)
+            if (entry.PublicKey is null)
             {
-                return;
-            }
-
-            if (entry.Address.Port == 0)
-            {
-                Debug.LogError($"{entry.Address.Port} has a bound port of 0");
+                Debug.LogError("Can't add an AddressBookEntry without a public key");
                 return;
             }
 
@@ -300,8 +290,29 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
+            if (entry is DirectAddressBookEntry direct)
+            {
+                if (direct.Port == 0)
+                {
+                    Debug.LogError("Can't add a DirectAddressBookEntry without an address or a valid port");
+                    return;
+                }
+
+                Debug.Log($"Added node {direct.Address}");
+            }
+            else if (entry is ExternalAddressBookEntry external)
+            {
+                Debug.Log($"Added node {external.RelayJoinCode}");
+                // TODO: Add it to the external connection manager
+            }
+            else
+            {
+                throw new ArgumentException("Invalid AddressBookEntry type");
+            }
+
+            Debug.Log($"Discovered {_addressBook.Count} of {Config.TotalNodes}");
+
             _addressBook.Add(entry);
-            Debug.Log($"Added node {entry.Address} with pk {Convert.ToBase64String(entry.PublicKey.AsDer())}. Discovered {_addressBook.Count} of {Config.TotalNodes}");
 
             if (_addressBook.Count == Config.TotalNodes && !_platformStarted)
             {
@@ -316,7 +327,7 @@ namespace Tashi.NetworkTransport
                 throw new InvalidOperationException("_platform is null");
             }
 
-            Debug.Log($"StartSyncing for client ID {_clientId} on {AddressBookEntry.Address}");
+            Debug.Log($"StartSyncing for client ID {_clientId}");
 
             try
             {

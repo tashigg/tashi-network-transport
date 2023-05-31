@@ -79,12 +79,21 @@ namespace Tashi.ConsensusEngine
         {
             foreach (var entry in entries)
             {
-                var result = tce_add_node(
-                    _platform,
-                    $"{entry.Address.Address}:{entry.Address.Port}",
-                    entry.PublicKey.AsDer(),
-                    (uint)entry.PublicKey.AsDer().Length
-                );
+                var result = Result.EmptyAddressBook;
+
+                if (entry is DirectAddressBookEntry direct)
+                {
+                    result = tce_add_node(
+                        _platform,
+                        $"{direct.Address}:{direct.Port}",
+                        entry.PublicKey.Der,
+                        (uint)entry.PublicKey.Der.Length
+                    );
+                }
+                else
+                {
+                    // TODO: handle external address book entries, set result
+                }
 
                 if (result != Result.Success)
                 {

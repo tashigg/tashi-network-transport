@@ -33,7 +33,7 @@ namespace TashiConsensusEngineTests
                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEnuFeVYEXlsIVekaTuzkCdswic/bbNz1lO/x1OTn8AQZ4fT8W3YXjiuGyydzPniKsU6yw2r1wdiL0crhu52HFHQ==");
 
             Assert.AreEqual(
-                SecretKey.FromDer(secretKeyDer).GetPublicKey().AsDer(),
+                SecretKey.FromDer(secretKeyDer).GetPublicKey().Der,
                 publicKeyDer
             );
         }

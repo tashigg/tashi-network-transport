@@ -18,7 +18,7 @@ namespace Tashi.NetworkTransport
             {
                 // This IPEndPoint value is nonsense, but an address book
                 // entry must exist to be able to start the platform.
-                new AddressBookEntry(new IPEndPoint(IPAddress.Any, 0), secretKey.GetPublicKey())
+                new DirectAddressBookEntry(new IPEndPoint(IPAddress.Any, 0), secretKey.GetPublicKey())
             };
 
             platform.Start(addressBook);

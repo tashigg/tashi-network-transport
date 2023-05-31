@@ -56,7 +56,7 @@ namespace Tashi.ConsensusEngine
 
             var der = new byte[fce.creator_id_len];
             Marshal.Copy(fce.creator_id, der, 0, (int)fce.creator_id_len);
-            CreatorPublicKey = PublicKey.FromDer(der);
+            CreatorPublicKey = new PublicKey(der);
 
             TimestampCreated = fce.timestamp_created;
             TimestampReceived = fce.timestamp_received;

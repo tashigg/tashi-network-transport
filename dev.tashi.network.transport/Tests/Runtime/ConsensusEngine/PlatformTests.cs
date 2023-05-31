@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -29,7 +31,7 @@ namespace TashiConsensusEngineTests
 
         public AddressBookEntry GetAddressBookEntry()
         {
-            return new AddressBookEntry { Address = _platform.GetBoundAddress(), PublicKey = _publicKey };
+            return new DirectAddressBookEntry(_platform.GetBoundAddress(), _publicKey);
         }
 
         public ConsensusEvent? GetEvent()
@@ -121,13 +123,9 @@ namespace TashiConsensusEngineTests
         {
             var secretKey = SecretKey.Generate();
             using var platform = new Platform(NetworkMode.Loopback, 0, TimeSpan.FromMilliseconds(33), secretKey);
-            var addressBook = new[]
+            var addressBook = new AddressBookEntry[]
             {
-                new AddressBookEntry
-                {
-                    Address = platform.GetBoundAddress(),
-                    PublicKey = secretKey.GetPublicKey(),
-                },
+                new DirectAddressBookEntry(platform.GetBoundAddress(), secretKey.GetPublicKey())
             };
             platform.Start(addressBook);
             platform.Send(new byte[] { 1, 2, 3 });

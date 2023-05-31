@@ -12,18 +12,8 @@ namespace TashiConsensusEngineTests
         {
             var der = new byte[PublicKey.DerLength];
             Assert.AreEqual(
-                PublicKey.FromDer(der),
-                PublicKey.FromDer(der)
-            );
-        }
-
-        [Test]
-        public void AsDer_ReturnsConstructorValue()
-        {
-            var der = new byte[PublicKey.DerLength];
-            Assert.AreEqual(
-                PublicKey.FromDer(der).AsDer(),
-                der
+                new PublicKey(der),
+                new PublicKey(der)
             );
         }
 
@@ -31,10 +21,16 @@ namespace TashiConsensusEngineTests
         public void FromDer_ForInvalidValue_ThrowsException()
         {
             var small = new byte[PublicKey.DerLength - 1];
-            Assert.Throws<ArgumentException>(() => PublicKey.FromDer(small));
+            Assert.Throws<ArgumentException>(() =>
+            {
+                var publicKey = new PublicKey(small);
+            });
 
             var large = new byte[PublicKey.DerLength + 1];
-            Assert.Throws<ArgumentException>(() => PublicKey.FromDer(large));
+            Assert.Throws<ArgumentException>(() =>
+            {
+                var publicKey = new PublicKey(large);
+            });
         }
     }
 }
