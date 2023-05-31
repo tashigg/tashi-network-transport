@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Net;
 using System.Threading.Tasks;
 using Unity.Networking.Transport;
@@ -18,15 +19,10 @@ namespace Tashi.ConsensusEngine
         private Platform _platform;
         private ushort _peerNodesCount;
 
-        private Allocation? _allocation;
+        private bool _bindStarted;
+        private ExternalListener? _externalListener;
 
-        private NetworkDriver? _networkDriver;
-
-        private bool _bound;
-
-        private List<NetworkConnection> _connections = new();
-
-        private Dictionary<SockAddr, NetworkConnection> _addressToConnection = new();
+        private readonly Dictionary<SockAddr, ExternalConnection> _externalConnections = new();
 
         public ExternalConnectionManager(Platform platform, ushort totalNodes)
         {
@@ -36,99 +32,37 @@ namespace Tashi.ConsensusEngine
             _peerNodesCount = (ushort) (totalNodes - 1);
         }
 
-        public async Task BindAsync()
+        /**
+         * Call this after Unity services have been initialized.
+         *
+         * Returns the join code to send to other peers.
+         */
+        public async Task<string> BindAsync()
         {
-            if (_bound) return;
-            
-            if (_allocation == null)
-            {
-                _allocation = await RelayService.Instance.CreateAllocationAsync(_peerNodesCount);
-            }
-            
-            var serverData = new RelayServerData(_allocation, "udp");
+            if (!_bindStarted) throw new Exception("already called");
 
-            var networkSettings = new NetworkSettings();
-            networkSettings.WithRelayParameters(ref serverData);
+            _bindStarted = true;
 
-            _networkDriver = NetworkDriver.Create(networkSettings);
-            
-            if (_networkDriver?.Bind(NetworkEndPoint.AnyIpv4) != 0)
-            {
-                Debug.LogError("Host client failed to bind");
-            }
-            else
-            {
-                if (_networkDriver?.Listen() != 0)
-                {
-                    Debug.LogError("Host client failed to listen");
-                }
-                else
-                {
-                    Debug.Log("Host client bound to Relay server");
-                    _bound = true;
-                }
-            }
+            _externalListener = await ExternalListener.BindAsync(_peerNodesCount);
+            return _externalListener.JoinCode;
         }
 
-        public void Connect(SockAddr addr, AllocationData allocationData)
+        /**
+         * Call this when we get a new join code for a client.
+         */
+        public async Task Connect(ulong clientId, string joinCode)
         {
+            var sockAddr = SockAddr.FromClientId(clientId);
             
+            if (_externalConnections.ContainsKey(sockAddr)) return;
+
+            var connection = await ExternalConnection.ConnectAsync(clientId, joinCode);
+            
+            _externalConnections.Add(sockAddr, connection);
         }
 
         public void Update()
         {
-            if (!_bound) return;
-
-            NetworkDriver networkDriver;
-
-            if (_networkDriver != null)
-            {
-                networkDriver = _networkDriver.Value;
-            }
-            else
-            {
-                return;
-            }
-
-            networkDriver.ScheduleUpdate().Complete();
-
-            NetworkConnection incomingConnection;
-
-            while ((incomingConnection = networkDriver.Accept()) != default)
-            {
-                _connections.Add(incomingConnection);
-            }
-
-            foreach (var conn in _connections)
-            {
-                NetworkEvent.Type eventType;
-
-                while ((eventType = networkDriver.PopEventForConnection(conn, out DataStreamReader stream)) !=
-                       NetworkEvent.Type.Empty)
-                {
-                    switch (eventType)
-                    {
-                        case NetworkEvent.Type.Data:
-                            // There's no method for reading a `ulong` or even `long` in network byte order.
-                            var clientId = stream.ReadULong();
-
-                            // And this method isn't overloaded for unsigned types, sigh.
-                            clientId = (ulong) IPAddress.NetworkToHostOrder((long)clientId);
-
-                            var sockAddr = SockAddr.FromClientId(clientId);
-
-                            _addressToConnection.TryAdd(sockAddr, conn);
-                            
-                            _platform.ExternalReceive(sockAddr, stream);
-                            break;
-                        case NetworkEvent.Type.Connect:
-                            break;
-                        case NetworkEvent.Type.Disconnect:
-                            break;
-                    }
-                }
-            }
-
             while (true)
             {
                 var maybeTransmit = _platform.GetExternalTransmit();
@@ -142,11 +76,11 @@ namespace Tashi.ConsensusEngine
                 // against null, but it doesn't.
                 var transmit = maybeTransmit.Value;
 
-                NetworkConnection conn;
+                ExternalConnection conn;
 
                 try
                 {
-                    conn = _addressToConnection[transmit.addr];
+                    conn = _externalConnections[transmit.addr];
                 }
                 catch (KeyNotFoundException e)
                 {
@@ -154,14 +88,174 @@ namespace Tashi.ConsensusEngine
                     continue;
                 }
 
-                var clientId = transmit.addr.ClientId;
+                conn.Send(transmit.packet);
+            }
 
-                networkDriver.BeginSend(conn, out var writer, transmit.packet.Length + 8);
+            foreach (var conn in _externalConnections)
+            {
+                conn.Value.Update(_platform);
+            }
 
-                writer.WriteULong((ulong)IPAddress.HostToNetworkOrder((long)clientId!));
-                writer.AsNativeArray().CopyFrom(transmit.packet);
+            _externalListener?.Update(_platform);
+        }
+    }
+    
+    internal class ExternalConnection
+    {
+        // Because the `NetworkSettings` we pass to the `NetworkDriver` has the host allocation ID,
+        // we actually need a separate instance of `NetworkDriver` *per* peer.
+        private NetworkDriver _networkDriver;
+        private NetworkConnection _networkConnection;
 
-                networkDriver.EndSend(writer);
+        private bool _connected;
+        private ulong _clientId;
+
+        internal static async Task<ExternalConnection> ConnectAsync(ulong clientId, string joinCode)
+        {
+            var allocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
+            
+            var serverData = new RelayServerData(allocation, "udp");
+
+            var networkSettings = new NetworkSettings();
+            networkSettings.WithRelayParameters(ref serverData);
+
+            var networkDriver = NetworkDriver.Create(networkSettings);
+            
+            if (networkDriver.Bind(NetworkEndPoint.AnyIpv4) != 0)
+            {
+                throw new Exception("failed to bind to 0.0.0.0:0");
+            }
+
+            var networkConnection = networkDriver.Connect();
+
+            return new ExternalConnection
+            {
+                _clientId = clientId,
+                _networkDriver = networkDriver,
+                _networkConnection = networkConnection,
+                _connected = false
+            };
+        }
+
+        internal void Send(byte[] packet)
+        {
+            _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length + 8);
+
+            writer.WriteULong((ulong)IPAddress.HostToNetworkOrder((long)_clientId));
+            writer.AsNativeArray().CopyFrom(packet);
+
+            _networkDriver.EndSend(writer);
+        }
+
+        internal void Update(Platform platform)
+        {
+            _networkDriver.ScheduleUpdate().Complete();
+
+            NetworkEvent.Type eventType;
+
+            while ((eventType = _networkDriver.PopEventForConnection(_networkConnection, out DataStreamReader stream)) !=
+                   NetworkEvent.Type.Empty)
+            {
+                switch (eventType)
+                {
+                    case NetworkEvent.Type.Data:
+                        // There's no method for reading a `ulong` or even `long` in network byte order.
+                        var clientId = stream.ReadULong();
+
+                        // And this method isn't overloaded for unsigned types, sigh.
+                        clientId = (ulong) IPAddress.NetworkToHostOrder((long)clientId);
+
+                        var sockAddr = SockAddr.FromClientId(clientId);
+
+                        platform.ExternalReceive(sockAddr, stream);
+                        break;
+                    case NetworkEvent.Type.Connect:
+                        break;
+                    case NetworkEvent.Type.Disconnect:
+                        // TODO: handle disconnection
+                        break;
+                }
+            }
+        }
+    }
+
+    internal class ExternalListener
+    {
+        private NetworkDriver _networkDriver;
+
+        private Allocation _allocation;
+        internal string JoinCode;
+
+        private readonly List<NetworkConnection> _connections = new();
+
+        internal static async Task<ExternalListener> BindAsync(int peerCount)
+        {
+            var allocation = await RelayService.Instance.CreateAllocationAsync(peerCount);
+            var joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+
+            var serverData = new RelayServerData(allocation, "udp");
+
+            var networkSettings = new NetworkSettings();
+            networkSettings.WithRelayParameters(ref serverData);
+
+            var networkDriver = NetworkDriver.Create(networkSettings);
+            
+            if (networkDriver.Bind(NetworkEndPoint.AnyIpv4) != 0)
+            {
+                throw new Exception("failed to bind to 0.0.0.0:0");
+            }
+            
+            if (networkDriver.Listen() != 0)
+            {
+                throw new Exception("Host client failed to listen");
+            }
+
+            return new ExternalListener
+            {
+                _networkDriver = networkDriver,
+                _allocation = allocation,
+                JoinCode = joinCode
+            };
+        }
+
+        internal void Update(Platform platform)
+        {
+            _networkDriver.ScheduleUpdate().Complete();
+
+            NetworkConnection incomingConnection;
+
+            while ((incomingConnection = _networkDriver.Accept()) != default)
+            {
+                _connections.Add(incomingConnection);
+            }
+            
+            foreach (var conn in _connections)
+            {
+                NetworkEvent.Type eventType;
+
+                while ((eventType = _networkDriver.PopEventForConnection(conn, out DataStreamReader stream)) !=
+                       NetworkEvent.Type.Empty)
+                {
+                    switch (eventType)
+                    {
+                        case NetworkEvent.Type.Data:
+                            // There's no method for reading a `ulong` or even `long` in network byte order.
+                            var clientId = stream.ReadULong();
+
+                            // And this method isn't overloaded for unsigned types, sigh.
+                            clientId = (ulong) IPAddress.NetworkToHostOrder((long)clientId);
+
+                            var sockAddr = SockAddr.FromClientId(clientId);
+
+                            platform.ExternalReceive(sockAddr, stream);
+                            break;
+                        case NetworkEvent.Type.Connect:
+                            break;
+                        case NetworkEvent.Type.Disconnect:
+                            // TODO: handle disconnection
+                            break;
+                    }
+                }
             }
         }
     }

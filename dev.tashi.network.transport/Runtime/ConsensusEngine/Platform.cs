@@ -15,6 +15,7 @@ namespace Tashi.ConsensusEngine
     {
         Loopback,
         Local,
+        External
     }
 
     /// <summary>

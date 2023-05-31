@@ -35,10 +35,10 @@ namespace Tashi.NetworkTransport
         private ulong? _clientId;
 
         private List<PublicKey> _connectedPeers = new();
-        
-
 
         private ExternalConnectionManager? _externalConnectionManager;
+
+        private static readonly NetworkMode NetworkMode = NetworkMode.External;
 
         TashiNetworkTransport()
         {
@@ -231,7 +231,7 @@ namespace Tashi.NetworkTransport
             }
 
             _platform = new Platform(
-                NetworkMode.Local,
+                NetworkMode,
                 Config.BindPort,
                 TimeSpan.FromMilliseconds(Config.SyncInterval),
                 _secretKey,
@@ -245,6 +245,19 @@ namespace Tashi.NetworkTransport
             Debug.Log($"Listening on {direct.Address}");
 
             AddAddressBookEntry(AddressBookEntry, _isServer);
+
+            if (NetworkMode == NetworkMode.External)
+            {
+                var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, Config.TotalNodes);
+                externalManager.BindAsync()
+                    .ContinueWith((joinCode) =>
+                    {
+                        // Join code to send to other peers.
+                        // Not really sure how best to get this out.
+                        Debug.Log($"got join code: {joinCode}");
+                    })
+                    .Start();
+            }
 
             OnPlatformInit?.Invoke(this);
         }
