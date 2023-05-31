@@ -64,7 +64,7 @@ namespace Tashi.ConsensusEngine
                 throw new Exception("Failed to get the public key from the secret key");
             }
 
-            return PublicKey.FromDer(der);
+            return new PublicKey(der);
         }
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_secret_key_generate")]

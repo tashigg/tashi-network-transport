@@ -14,7 +14,7 @@ namespace Tashi.ConsensusEngine
 
         public byte[] Der { get; }
 
-        private PublicKey(byte[] der)
+        public PublicKey(byte[] der)
         {
             if (der.Length != DerLength)
             {
@@ -22,16 +22,6 @@ namespace Tashi.ConsensusEngine
             }
 
             Der = der;
-        }
-
-        public static PublicKey FromDer(byte[] der)
-        {
-            return new PublicKey(der);
-        }
-
-        public byte[] AsDer()
-        {
-            return Der;
         }
 
         public bool Equals(PublicKey? other)
