@@ -238,27 +238,26 @@ namespace Tashi.NetworkTransport
                 _secretKey.GetPublicKey().ClientId
             );
 
-            // TODO: Also handle ExternalAddressBookEntry. It will be serialized
-            // and sent to the lobby k/v store when `OnPlatformInit?.Invoke(this)` is called
-            var direct = new DirectAddressBookEntry(_platform.GetBoundAddress(), _secretKey.GetPublicKey());
-            AddressBookEntry = direct;
-            Debug.Log($"Listening on {direct.Address}");
-
-            AddAddressBookEntry(AddressBookEntry, _isServer);
-
             if (NetworkMode == NetworkMode.External)
             {
                 var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, Config.TotalNodes);
                 externalManager.BindAsync()
-                    .ContinueWith((joinCode) =>
+                    .ContinueWith(bindTask =>
                     {
-                        // Join code to send to other peers.
-                        // Not really sure how best to get this out.
-                        Debug.Log($"got join code: {joinCode}");
+                        InitFinished(new ExternalAddressBookEntry(bindTask.Result, _secretKey.GetPublicKey()));
                     })
                     .Start();
             }
+            else
+            {
+                InitFinished(new DirectAddressBookEntry(_platform.GetBoundAddress(), _secretKey.GetPublicKey()));
+            }
+        }
 
+        private void InitFinished(AddressBookEntry addressBookEntry)
+        {
+            AddressBookEntry = addressBookEntry;
+            AddAddressBookEntry(addressBookEntry);
             OnPlatformInit?.Invoke(this);
         }
 
@@ -312,8 +311,16 @@ namespace Tashi.NetworkTransport
             }
             else if (entry is ExternalAddressBookEntry external)
             {
+                if (_externalConnectionManager == null)
+                {
+                    Debug.Log($"Received external address book entry in non-external mode: {external}");
+                    return;
+                }
+
                 Debug.Log($"Added node {external.RelayJoinCode}");
-                // TODO: Add it to the external connection manager
+
+                _externalConnectionManager.Connect(external.PublicKey.ClientId, external.RelayJoinCode)
+                    .Start();
             }
             else
             {

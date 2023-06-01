@@ -229,6 +229,8 @@ namespace Tashi.ConsensusEngine
                 
             Marshal.Copy(packetPtr, packet, 0, (int) packetLen);
 
+            tce_external_transmit_destroy(transmit);
+
             return (sockAddr, packet);
         }
 
@@ -365,6 +367,9 @@ namespace Tashi.ConsensusEngine
             out IntPtr packetOut,
             out UIntPtr packetLenOut
         );
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_packet")]
+        static extern Result tce_external_transmit_destroy(IntPtr transmit);
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare")]
         static extern Result tce_external_recv_prepare(

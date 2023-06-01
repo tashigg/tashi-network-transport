@@ -110,6 +110,14 @@ namespace Tashi.ConsensusEngine
         private bool _connected;
         private ulong _clientId;
 
+        private ExternalConnection(ulong clientId, NetworkDriver networkDriver, NetworkConnection networkConnection, bool connected)
+        {
+            _clientId = clientId;
+            _networkDriver = networkDriver;
+            _networkConnection = networkConnection;
+            _connected = connected;
+        }
+
         internal static async Task<ExternalConnection> ConnectAsync(ulong clientId, string joinCode)
         {
             var allocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
@@ -128,13 +136,8 @@ namespace Tashi.ConsensusEngine
 
             var networkConnection = networkDriver.Connect();
 
-            return new ExternalConnection
-            {
-                _clientId = clientId,
-                _networkDriver = networkDriver,
-                _networkConnection = networkConnection,
-                _connected = false
-            };
+            return new ExternalConnection(clientId: clientId, networkDriver: networkDriver,
+                networkConnection: networkConnection, connected: false);
         }
 
         internal void Send(byte[] packet)
@@ -188,6 +191,13 @@ namespace Tashi.ConsensusEngine
 
         private readonly List<NetworkConnection> _connections = new();
 
+        private ExternalListener(NetworkDriver networkDriver, Allocation allocation, string joinCode)
+        {
+            _networkDriver = networkDriver;
+            _allocation = allocation;
+            JoinCode = joinCode;
+        }
+
         internal static async Task<ExternalListener> BindAsync(int peerCount)
         {
             var allocation = await RelayService.Instance.CreateAllocationAsync(peerCount);
@@ -210,12 +220,7 @@ namespace Tashi.ConsensusEngine
                 throw new Exception("Host client failed to listen");
             }
 
-            return new ExternalListener
-            {
-                _networkDriver = networkDriver,
-                _allocation = allocation,
-                JoinCode = joinCode
-            };
+            return new ExternalListener(networkDriver: networkDriver, allocation: allocation, joinCode: joinCode);
         }
 
         internal void Update(Platform platform)
