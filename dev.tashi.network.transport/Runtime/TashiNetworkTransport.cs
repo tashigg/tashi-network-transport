@@ -257,7 +257,7 @@ namespace Tashi.NetworkTransport
         private void InitFinished(AddressBookEntry addressBookEntry)
         {
             AddressBookEntry = addressBookEntry;
-            AddAddressBookEntry(addressBookEntry);
+            AddAddressBookEntry(addressBookEntry, _isServer);
             OnPlatformInit?.Invoke(this);
         }
 
