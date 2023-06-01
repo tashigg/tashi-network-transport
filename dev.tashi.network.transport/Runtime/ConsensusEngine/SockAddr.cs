@@ -99,8 +99,11 @@ namespace Tashi.ConsensusEngine
 
         public static SockAddr FromClientId(ulong clientId)
         {
-            SockAddr addrOut = default;
-            addrOut._addressFamily = AddressFamily.InterNetworkV6;
+            SockAddr addrOut = new SockAddr
+            {
+                _addressFamily = AddressFamily.InterNetworkV6,
+                _data = new byte[DataLen]
+            };
             
             var dataSpan = addrOut._dataSpan;
 

@@ -41,7 +41,7 @@ namespace Tashi.ConsensusEngine
         {
             _platform = tce_init(
                 mode,
-                null,
+                secretKey.GetPublicKey().SyntheticEndpoint.ToString(),
                 port,
                 // FIXME: Ensure the conversion can succeed
                 (UInt32)syncInterval.TotalMilliseconds,
