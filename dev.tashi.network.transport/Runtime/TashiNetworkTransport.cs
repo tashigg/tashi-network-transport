@@ -17,7 +17,6 @@ namespace Tashi.NetworkTransport
     {
         public TashiNetworkTransportEditorConfig Config = new();
         public AddressBookEntry? AddressBookEntry;
-        public PublicKey? HostPublicKey;
 
         public delegate void OnPlatformInitHandler(object sender);
 
@@ -28,6 +27,7 @@ namespace Tashi.NetworkTransport
         private List<AddressBookEntry> _addressBook = new();
         private bool _platformStarted;
         private bool _isServer;
+        private PublicKey? _hostPublicKey;
 
         // For now we just use 8 bytes of the public key.
         // LB FIXME: Handle collisions, or make use of a sequence somehow.
@@ -122,7 +122,7 @@ namespace Tashi.NetworkTransport
                     InvokeOnTransportEvent(NetworkEvent.Connect, creatorId,
                         default, receiveTime);
                 }
-                else if (dataEvent.CreatorPublicKey.Equals(HostPublicKey))
+                else if (dataEvent.CreatorPublicKey.Equals(_hostPublicKey))
                 {
                     Debug.Log($"First sighting of host {creatorId}");
                     InvokeOnTransportEvent(NetworkEvent.Connect, 0, default,
@@ -216,8 +216,8 @@ namespace Tashi.NetworkTransport
         public override bool StartServer()
         {
             Debug.Log($"TNT StartServer for client {_clientId}");
-            InitializePlatform();
             _isServer = true;
+            InitializePlatform();
             return true;
         }
 
@@ -241,7 +241,7 @@ namespace Tashi.NetworkTransport
             AddressBookEntry = direct;
             Debug.Log($"Listening on {direct.Address}");
 
-            AddAddressBookEntry(AddressBookEntry);
+            AddAddressBookEntry(AddressBookEntry, _isServer);
 
             OnPlatformInit?.Invoke(this);
         }
@@ -277,14 +277,8 @@ namespace Tashi.NetworkTransport
 
         public override ulong ServerClientId { get; }
 
-        public void AddAddressBookEntry(AddressBookEntry entry)
+        public void AddAddressBookEntry(AddressBookEntry entry, bool treatAsHost)
         {
-            if (entry.PublicKey is null)
-            {
-                Debug.LogError("Can't add an AddressBookEntry without a public key");
-                return;
-            }
-
             if (_addressBook.Contains(entry))
             {
                 return;
@@ -310,9 +304,19 @@ namespace Tashi.NetworkTransport
                 throw new ArgumentException("Invalid AddressBookEntry type");
             }
 
-            Debug.Log($"Discovered {_addressBook.Count} of {Config.TotalNodes}");
+            if (treatAsHost)
+            {
+                if (_hostPublicKey != null)
+                {
+                    throw new ArgumentException("Another address book entry has already been set as the host");
+                }
+
+                _hostPublicKey = entry.PublicKey;
+            }
 
             _addressBook.Add(entry);
+
+            Debug.Log($"Discovered {_addressBook.Count} of {Config.TotalNodes}");
 
             if (_addressBook.Count == Config.TotalNodes && !_platformStarted)
             {
