@@ -12,29 +12,28 @@ namespace Tashi.ConsensusEngine
     {
         public SockAddr(IPEndPoint ipEndPoint)
         {
-            _addressFamily = ipEndPoint.AddressFamily;
+            _addressFamily = (UInt16)ipEndPoint.AddressFamily;
             _data = new byte[DataLen];
             
-            BinaryPrimitives.WriteUInt16BigEndian(_dataSpan, (ushort) ipEndPoint.Port);
-            
-            ipEndPoint.Address.TryWriteBytes(_dataSpan, out int bytesWritten);
+            BinaryPrimitives.WriteUInt16BigEndian(_data, (ushort) ipEndPoint.Port);
+
+            IPEndPoint = ipEndPoint;
         }
 
         // Total struct size is 128 bytes, minus 2 bytes for AddressFamily
         private const int DataLen = 126;
         
-        [MarshalAs(UnmanagedType.U2)] private AddressFamily _addressFamily;
+        [MarshalAs(UnmanagedType.U2)] private UInt16 _addressFamily;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst=DataLen)] private byte[] _data;
-        
-        public AddressFamily AddressFamily => _addressFamily;
 
-        private Span<byte> _dataSpan => new(_data);
+        // C#'s AddressFamily enum is 4 bytes, but it's 2 in the C standard library.
+        public AddressFamily AddressFamily => (AddressFamily)_addressFamily;
 
         internal UIntPtr Len
         {
             get
             {
-                switch (_addressFamily)
+                switch ((AddressFamily)_addressFamily)
                 {
                     case AddressFamily.InterNetwork:
                         // 2 bytes for `AddressFamily`, 2 bytes for the port, 4 bytes for the address.
@@ -44,7 +43,7 @@ namespace Tashi.ConsensusEngine
                         // 4 bytes for `flowinfo`, 16 bytes for the address, 4 bytes for the scope ID.
                         return new(2 + 2 + 4 + 16 + 4);
                     default:
-                        throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {AddressFamily}");
+                        throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {_addressFamily}");
                 }
             }
         }
@@ -54,19 +53,19 @@ namespace Tashi.ConsensusEngine
             get
             {
                 // First two bytes are the port
-                UInt16 port = BinaryPrimitives.ReadUInt16BigEndian(_dataSpan);
+                UInt16 port = BinaryPrimitives.ReadUInt16BigEndian(_data);
 
                 IPAddress address;
 
-                switch (_addressFamily)
+                switch (AddressFamily)
                 {
                     case AddressFamily.InterNetwork:
-                        address = new IPAddress(_dataSpan[2..6]);
+                        address = new IPAddress(_data[2..6]);
                         break;
                     case AddressFamily.InterNetworkV6:
                         // sockaddr_in6 actually has the `flowinfo` field before the address, which is 4 bytes.
                         // Then the scope identifier follows the address, which for most intents and purposes is zero.
-                        address = new IPAddress(_dataSpan[6..22], BinaryPrimitives.ReadUInt16BigEndian(_dataSpan[22..]));
+                        address = new IPAddress(_data[6..22], BinaryPrimitives.ReadUInt16BigEndian(_data[22..]));
                         break;
                     default:
                         throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {AddressFamily}");
@@ -74,17 +73,35 @@ namespace Tashi.ConsensusEngine
 
                 return new IPEndPoint(address, port);
             }
+
+            set
+            {
+                _addressFamily = (UInt16)value.AddressFamily;
+
+                switch (value.AddressFamily)
+                {
+                    case AddressFamily.InterNetwork:
+                        BitConverter.TryWriteBytes(_data[2..], _addressFamily);
+                        break;
+                    case AddressFamily.InterNetworkV6:
+                        value.Address.TryWriteBytes(_data[6..], out _);
+                        BitConverter.TryWriteBytes(_data[22..], value.Port);
+                        break;
+                    default:
+                        throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {value.AddressFamily}");
+                }
+            }
         }
 
         public bool HasClientId
         {
             get
             {
-                if (_addressFamily != AddressFamily.InterNetworkV6) return false;
+                if ((AddressFamily)_addressFamily != AddressFamily.InterNetworkV6) return false;
 
                 return
-                    BinaryPrimitives.ReadUInt16BigEndian(_dataSpan) == ClientIdPort &&
-                    _dataSpan[6..].StartsWith(new ReadOnlySpan<byte>(ClientIdAddressPrefix));
+                    BinaryPrimitives.ReadUInt16BigEndian(_data) == ClientIdPort &&
+                    new Span<byte>(_data[6..]).StartsWith(new ReadOnlySpan<byte>(ClientIdAddressPrefix));
             }
         }
 
@@ -93,7 +110,7 @@ namespace Tashi.ConsensusEngine
             get
             {
                 if (!HasClientId) return null;
-                return BinaryPrimitives.ReadUInt64BigEndian(_dataSpan[10..]);
+                return BinaryPrimitives.ReadUInt64BigEndian(_data[10..]);
             }
         }
 
@@ -101,11 +118,11 @@ namespace Tashi.ConsensusEngine
         {
             SockAddr addrOut = new SockAddr
             {
-                _addressFamily = AddressFamily.InterNetworkV6,
+                _addressFamily = (UInt16)AddressFamily.InterNetworkV6,
                 _data = new byte[DataLen]
             };
             
-            var dataSpan = addrOut._dataSpan;
+            var dataSpan = addrOut._data;
 
             BinaryPrimitives.WriteUInt16BigEndian(dataSpan, ClientIdPort);
             

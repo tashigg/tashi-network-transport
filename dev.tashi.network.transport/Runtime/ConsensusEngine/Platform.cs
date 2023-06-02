@@ -203,7 +203,7 @@ namespace Tashi.ConsensusEngine
 
             if (result != Result.Success)
             {
-                Debug.Log($"error from tce_external_transmit_get_addr: {result}");
+                Debug.Log($"error from tce_external_transmit_get_packet: {result}");
                 return null;
             }
 
@@ -350,7 +350,7 @@ namespace Tashi.ConsensusEngine
             out UIntPtr packetLenOut
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_packet")]
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_destroy")]
         static extern Result tce_external_transmit_destroy(IntPtr transmit);
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare")]
