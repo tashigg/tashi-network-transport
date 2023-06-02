@@ -37,38 +37,14 @@ namespace Tashi.ConsensusEngine
         /// until the Start method is called.
         /// </summary>
         ///
-        public Platform(NetworkMode mode, UInt16 port, TimeSpan syncInterval, SecretKey secretKey, ulong clientId)
+        public Platform(NetworkMode mode, IPEndPoint bindEndPoint, TimeSpan syncInterval, SecretKey secretKey)
         {
+            _clientId = secretKey.PublicKey.ClientId;
+            
             _platform = tce_init(
                 mode,
-                secretKey.GetPublicKey().SyntheticEndpoint.ToString(),
-                port,
-                // FIXME: Ensure the conversion can succeed
-                (UInt32)syncInterval.TotalMilliseconds,
-                secretKey.Der,
-                (uint)secretKey.Der.Length,
-                out var result
-            );
-
-            _clientId = clientId;
-
-            if (result != Result.Success)
-            {
-                throw new ArgumentException($"Failed to initialize the platform: {result}");
-            }
-        }
-
-        /// <summary>
-        /// Create a new platform. It won't begin communicating with other nodes
-        /// until the Start method is called.
-        /// </summary>
-        ///
-        public Platform(NetworkMode mode, IPEndPoint bindAddress, UInt16 port, TimeSpan syncInterval, SecretKey secretKey)
-        {
-            _platform = tce_init(
-                mode,
-                bindAddress.ToString(),
-                port,
+                bindEndPoint.Address.ToString(),
+                (ushort) bindEndPoint.Port,
                 // FIXME: Ensure the conversion can succeed
                 (UInt32)syncInterval.TotalMilliseconds,
                 secretKey.Der,
@@ -115,21 +91,27 @@ namespace Tashi.ConsensusEngine
         {
             foreach (var entry in entries)
             {
-                var result = Result.EmptyAddressBook;
+                String address;
 
                 if (entry is DirectAddressBookEntry direct)
                 {
-                    result = tce_add_node(
-                        _platform,
-                        $"{direct.Address}:{direct.Port}",
-                        entry.PublicKey.Der,
-                        (uint)entry.PublicKey.Der.Length
-                    );
+                    address = new IPEndPoint(direct.Address, direct.Port).ToString();
+                }
+                else if (entry is ExternalAddressBookEntry external)
+                {
+                    address = external.PublicKey.SyntheticEndpoint.ToString();
                 }
                 else
                 {
-                    // TODO: handle external address book entries, set result
+                    throw new Exception($"unsupported AddressBookEntry type: {entry}");
                 }
+
+                var result = tce_add_node(
+                    _platform,
+                    address,
+                    entry.PublicKey.Der,
+                    (uint)entry.PublicKey.Der.Length
+                );
 
                 if (result != Result.Success)
                 {

@@ -39,7 +39,7 @@ namespace Tashi.ConsensusEngine
          */
         public async Task<string> BindAsync()
         {
-            if (!_bindStarted) throw new Exception("already called");
+            if (_bindStarted) throw new Exception("already called");
 
             _bindStarted = true;
 
@@ -50,7 +50,7 @@ namespace Tashi.ConsensusEngine
         /**
          * Call this when we get a new join code for a client.
          */
-        public async Task Connect(ulong clientId, string joinCode)
+        public async Task ConnectAsync(ulong clientId, string joinCode)
         {
             var sockAddr = SockAddr.FromClientId(clientId);
             

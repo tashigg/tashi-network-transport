@@ -4,6 +4,7 @@ using System;
 using System.Buffers.Binary;
 using System.Linq;
 using System.Net;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace Tashi.ConsensusEngine
@@ -22,6 +23,7 @@ namespace Tashi.ConsensusEngine
         /// <summary>
         ///  Returns the uncompressed raw bytes of the public key (X and Y coordinates concatenated together).
         /// </summary>
+        [JsonIgnore]
         public ReadOnlySpan<Byte> RawBytes => new(Der, Der.Length - RawBytesLength, RawBytesLength);
 
         public PublicKey(byte[] der)
@@ -51,8 +53,10 @@ namespace Tashi.ConsensusEngine
         // Using this method ensures the generated value is the same regardless of the platform endianness.
         public ulong ClientId => BinaryPrimitives.ReadUInt64BigEndian(RawBytes);
 
+        [JsonIgnore]
         public SockAddr SyntheticSockAddr => SockAddr.FromClientId(ClientId);
 
+        [JsonIgnore]
         public IPEndPoint SyntheticEndpoint => SyntheticSockAddr.IPEndPoint;
     }
 }

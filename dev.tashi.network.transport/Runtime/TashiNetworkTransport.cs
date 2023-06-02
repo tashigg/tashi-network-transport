@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 using Unity.Netcode;
 using UnityEngine;
 using Tashi.ConsensusEngine;
@@ -43,8 +44,11 @@ namespace Tashi.NetworkTransport
         TashiNetworkTransport()
         {
             _secretKey = SecretKey.Generate();
-            PublicKey publicKey = _secretKey.GetPublicKey();
+            PublicKey publicKey = _secretKey.PublicKey;
             _clientId = publicKey.ClientId;
+            
+            // TODO: implement support in TCE
+            // NativeLogger.Init("tashi_consensus_engine=warn");
         }
 
         // Network transport events must be in terms of seconds since the game
@@ -230,27 +234,55 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
+            IPEndPoint bindEndPoint = NetworkMode == NetworkMode.External
+                ? _secretKey.PublicKey.SyntheticEndpoint
+                : new IPEndPoint(IPAddress.Any, Config.BindPort);
+
             _platform = new Platform(
                 NetworkMode,
-                Config.BindPort,
+                bindEndPoint,
                 TimeSpan.FromMilliseconds(Config.SyncInterval),
-                _secretKey,
-                _secretKey.GetPublicKey().ClientId
+                _secretKey
             );
 
             if (NetworkMode == NetworkMode.External)
             {
+                Debug.Log("binding in external mode");
+                
                 var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, Config.TotalNodes);
-                externalManager.BindAsync()
-                    .ContinueWith(bindTask =>
+                
+                // C#'s task system is markedly different from Rust's: in Rust, the consumer of a `Future`
+                // is responsible for driving it forward unless explicitly spawned into a runtime,
+                // whereas C# is closer to Javascript's Promise system where tasks dependent on the completion of a
+                // Promise just need to be attached to it to be automatically started when it completes.
+                //
+                // This makes sense if you consider that in C#, like Javascript, there is no overarching concept
+                // of ownership and multiple dependent tasks can consume the result of a single antecedent task.
+                //
+                // And in fact, like Javascript, the task returned by this method is automatically started ("hot"):
+                // https://stackoverflow.com/a/43089445
+                //
+                // Only explicitly created tasks are not started (or "cold").
+                var bindTask = externalManager.BindAsync();
+
+                bindTask.ContinueWith(_ =>
                     {
-                        InitFinished(new ExternalAddressBookEntry(bindTask.Result, _secretKey.GetPublicKey()));
-                    })
-                    .Start();
+                        if (bindTask.IsCompletedSuccessfully)
+                        {
+                            InitFinished(new ExternalAddressBookEntry(bindTask.Result, _secretKey.PublicKey));
+                        }
+                        else
+                        {
+                            Debug.LogWarning("exception from ExternalConnectionManager.BindAsync()");
+                            Debug.LogException(bindTask.Exception);
+                        }
+                    },
+                    // Ensure we use the Unity task scheduler and not the default, global one.
+                    TaskScheduler.FromCurrentSynchronizationContext());
             }
             else
             {
-                InitFinished(new DirectAddressBookEntry(_platform.GetBoundAddress(), _secretKey.GetPublicKey()));
+                InitFinished(new DirectAddressBookEntry(_platform.GetBoundAddress(), _secretKey.PublicKey));
             }
         }
 
@@ -319,8 +351,13 @@ namespace Tashi.NetworkTransport
 
                 Debug.Log($"Added node {external.RelayJoinCode}");
 
-                _externalConnectionManager.Connect(external.PublicKey.ClientId, external.RelayJoinCode)
-                    .Start();
+#pragma warning disable CS4014
+                if (!entry.PublicKey.Equals(_secretKey.PublicKey))
+                {
+                    // Only attempt to connect to another peer.
+                    _externalConnectionManager.ConnectAsync(external.PublicKey.ClientId, external.RelayJoinCode);
+                }
+#pragma warning restore CS4014
             }
             else
             {

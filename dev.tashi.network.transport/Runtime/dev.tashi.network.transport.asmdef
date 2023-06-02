@@ -4,7 +4,9 @@
     "references": [
         "Unity.Netcode.Runtime",
         "Unity.Services.Relay",
-        "Unity.Networking.Transport"
+        "Unity.Networking.Transport",
+        "Unity.Collections",
+        "Unity.Burst"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
