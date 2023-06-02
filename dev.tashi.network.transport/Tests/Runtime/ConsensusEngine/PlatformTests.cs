@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
 using Tashi.ConsensusEngine;
 using NUnit.Framework;
@@ -17,8 +18,9 @@ namespace TashiConsensusEngineTests
         public TestNode(NetworkMode mode = NetworkMode.Loopback)
         {
             var secretKey = SecretKey.Generate();
-            _publicKey = secretKey.GetPublicKey();
-            _platform = new Platform(mode, 0, TimeSpan.FromMilliseconds(33), secretKey);
+            var endPoint = new IPEndPoint(IPAddress.Any, 0);
+            _publicKey = secretKey.PublicKey;
+            _platform = new Platform(mode, endPoint, TimeSpan.FromMilliseconds(33), secretKey);
             Console.WriteLine($"Bound to {_platform.GetBoundAddress()}");
         }
 
@@ -36,7 +38,7 @@ namespace TashiConsensusEngineTests
 
         public ConsensusEvent? GetEvent()
         {
-            return _platform?.GetEvent();
+            return _platform.GetEvent();
         }
     }
 
@@ -122,10 +124,11 @@ namespace TashiConsensusEngineTests
         public void PlatformDisposal_DoesNotThrow()
         {
             var secretKey = SecretKey.Generate();
-            using var platform = new Platform(NetworkMode.Loopback, 0, TimeSpan.FromMilliseconds(33), secretKey);
+            var endPoint = new IPEndPoint(IPAddress.Any, 0);
+            using var platform = new Platform(NetworkMode.Loopback, endPoint, TimeSpan.FromMilliseconds(33), secretKey);
             var addressBook = new AddressBookEntry[]
             {
-                new DirectAddressBookEntry(platform.GetBoundAddress(), secretKey.GetPublicKey())
+                new DirectAddressBookEntry(platform.GetBoundAddress(), secretKey.PublicKey)
             };
             platform.Start(addressBook);
             platform.Send(new byte[] { 1, 2, 3 });

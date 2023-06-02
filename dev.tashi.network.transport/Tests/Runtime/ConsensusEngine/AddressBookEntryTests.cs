@@ -13,15 +13,15 @@ namespace TashiConsensusEngineTests
         public void Equals_Works()
         {
             var sk = SecretKey.Generate();
-            var entry1 = new DirectAddressBookEntry(IPAddress.Loopback,  0, sk.GetPublicKey());
-            var entry2 = new DirectAddressBookEntry(IPAddress.Loopback,  0, sk.GetPublicKey());
-            var entry3 = new DirectAddressBookEntry(IPAddress.Broadcast, 0, sk.GetPublicKey());
+            var entry1 = new DirectAddressBookEntry(IPAddress.Loopback,  0, sk.PublicKey);
+            var entry2 = new DirectAddressBookEntry(IPAddress.Loopback,  0, sk.PublicKey);
+            var entry3 = new DirectAddressBookEntry(IPAddress.Broadcast, 0, sk.PublicKey);
             Assert.AreEqual(entry1, entry2);
             Assert.AreNotEqual(entry1, entry3);
 
-            var external1 = new ExternalAddressBookEntry("123", sk.GetPublicKey());
-            var external2 = new ExternalAddressBookEntry("123", sk.GetPublicKey());
-            var external3 = new ExternalAddressBookEntry("456", sk.GetPublicKey());
+            var external1 = new ExternalAddressBookEntry("123", sk.PublicKey);
+            var external2 = new ExternalAddressBookEntry("123", sk.PublicKey);
+            var external3 = new ExternalAddressBookEntry("456", sk.PublicKey);
             Assert.AreEqual(external1, external2);
             Assert.AreNotEqual(external1, external3);
         }
@@ -30,7 +30,7 @@ namespace TashiConsensusEngineTests
         public void DirectSerialization_RoundTrip_Works()
         {
             var sk = SecretKey.Generate();
-            var expected = new DirectAddressBookEntry(IPAddress.Loopback, 0, sk.GetPublicKey());
+            var expected = new DirectAddressBookEntry(IPAddress.Loopback, 0, sk.PublicKey);
 
             var serialized = expected.Serialize();
             Debug.Log(serialized);
@@ -52,7 +52,7 @@ namespace TashiConsensusEngineTests
         public void ExternalSerialization_RoundTrip_Works()
         {
             var sk = SecretKey.Generate();
-            var expected = new ExternalAddressBookEntry("123", sk.GetPublicKey());
+            var expected = new ExternalAddressBookEntry("123", sk.PublicKey);
 
             var serialized = expected.Serialize();
             Debug.Log(serialized);
