@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace Tashi.ConsensusEngine
 {
@@ -15,6 +16,7 @@ namespace Tashi.ConsensusEngine
             _addressFamily = (UInt16)ipEndPoint.AddressFamily;
             _data = new byte[DataLen];
             
+            // N.B. All values written to `_data` must be in big-endian.
             BinaryPrimitives.WriteUInt16BigEndian(_data, (ushort) ipEndPoint.Port);
 
             IPEndPoint = ipEndPoint;
@@ -77,15 +79,18 @@ namespace Tashi.ConsensusEngine
             set
             {
                 _addressFamily = (UInt16)value.AddressFamily;
+                
+                // Unintuitively, the port is at the beginning of the data.
+                BinaryPrimitives.WriteUInt16BigEndian(_data, (ushort) value.Port);
 
                 switch (value.AddressFamily)
                 {
                     case AddressFamily.InterNetwork:
-                        BitConverter.TryWriteBytes(_data[2..], _addressFamily);
+                        value.Address.TryWriteBytes(_data[2..], out _);
                         break;
                     case AddressFamily.InterNetworkV6:
+                        // See above for why this starts at 6 instead of 2.
                         value.Address.TryWriteBytes(_data[6..], out _);
-                        BitConverter.TryWriteBytes(_data[22..], value.Port);
                         break;
                     default:
                         throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {value.AddressFamily}");
@@ -109,6 +114,8 @@ namespace Tashi.ConsensusEngine
         {
             get
             {
+                // This checks that the address is IPv6 and that it has our designated prefix,
+                // then reads the 64-bit address portion as the client ID.
                 if (!HasClientId) return null;
                 return BinaryPrimitives.ReadUInt64BigEndian(_data[10..]);
             }
@@ -122,15 +129,27 @@ namespace Tashi.ConsensusEngine
                 _data = new byte[DataLen]
             };
             
-            var dataSpan = addrOut._data;
+            // IMPORTANT: slicing a `Span` creates views into the underlying data,
+            // but slicing a `byte[]` creates copies.
+            var dataSpan = new Span<byte>(addrOut._data);
 
-            BinaryPrimitives.WriteUInt16BigEndian(dataSpan, ClientIdPort);
-            
+            var portSpan = dataSpan[..2];
+
+            BinaryPrimitives.WriteUInt16BigEndian(portSpan, ClientIdPort);
+
+            var addrPrefixSpan = new ReadOnlySpan<byte>(ClientIdAddressPrefix);
+                
             // sockaddr_in6 actually has the `flowinfo` field before the address, which is 4 bytes. 
             // By default we just initialize that to zero.
-            new ReadOnlySpan<byte>(ClientIdAddressPrefix).TryCopyTo(dataSpan[6..]);
+            var addrSpan = dataSpan[6..];
+
+            var successful = addrPrefixSpan.TryCopyTo(addrSpan);
             
-            BinaryPrimitives.WriteUInt64BigEndian(dataSpan[14..], clientId);
+            Debug.Assert(successful);
+            
+            var clientIdSpan = addrSpan[ClientIdAddressPrefix.Length ..];
+            
+            BinaryPrimitives.WriteUInt64BigEndian(clientIdSpan, clientId);
 
             return addrOut;
         }

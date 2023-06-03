@@ -46,9 +46,6 @@ namespace Tashi.NetworkTransport
             _secretKey = SecretKey.Generate();
             PublicKey publicKey = _secretKey.PublicKey;
             _clientId = publicKey.ClientId;
-            
-            // TODO: implement support in TCE
-            // NativeLogger.Init("tashi_consensus_engine=warn");
         }
 
         // Network transport events must be in terms of seconds since the game

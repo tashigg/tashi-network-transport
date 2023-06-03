@@ -32,5 +32,6 @@ namespace Tashi.ConsensusEngine
         RecvNotReady,
         InvalidSockAddr,
         BindAddressRequired,
+        LoggingAlreadySet,
     }
 }
