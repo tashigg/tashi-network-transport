@@ -11,16 +11,8 @@ namespace Tashi.ConsensusEngine
     [StructLayout(LayoutKind.Sequential, Pack=8, Size=128)]
     public struct SockAddr
     {
-        public SockAddr(IPEndPoint ipEndPoint)
-        {
-            _addressFamily = (UInt16)ipEndPoint.AddressFamily;
-            _data = new byte[DataLen];
-            
-            // N.B. All values written to `_data` must be in big-endian.
-            BinaryPrimitives.WriteUInt16BigEndian(_data, (ushort) ipEndPoint.Port);
-
-            IPEndPoint = ipEndPoint;
-        }
+        private const UInt16 NativeInetNetwork = 10;
+        private const UInt16 NativeInetNetwork6 = 17;
 
         // Total struct size is 128 bytes, minus 2 bytes for AddressFamily
         private const int DataLen = 126;
@@ -28,14 +20,29 @@ namespace Tashi.ConsensusEngine
         [MarshalAs(UnmanagedType.U2)] private UInt16 _addressFamily;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst=DataLen)] private byte[] _data;
 
-        // C#'s AddressFamily enum is 4 bytes, but it's 2 in the C standard library.
-        public AddressFamily AddressFamily => (AddressFamily)_addressFamily;
+        // C#'s AddressFamily doesn't match up to the native `AF_*` values and
+        // it's 4 bytes instead of 2.
+        public AddressFamily AddressFamily
+        {
+            get
+            {
+                switch (_addressFamily)
+                {
+                    case NativeInetNetwork:
+                        return AddressFamily.InterNetwork;
+                    case NativeInetNetwork6:
+                        return AddressFamily.InterNetworkV6;
+                    default:
+                        throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {_addressFamily}");
+                }
+            }
+        }
 
         internal UIntPtr Len
         {
             get
             {
-                switch ((AddressFamily)_addressFamily)
+                switch (AddressFamily)
                 {
                     case AddressFamily.InterNetwork:
                         // 2 bytes for `AddressFamily`, 2 bytes for the port, 4 bytes for the address.
@@ -59,12 +66,12 @@ namespace Tashi.ConsensusEngine
 
                 IPAddress address;
 
-                switch (AddressFamily)
+                switch (_addressFamily)
                 {
-                    case AddressFamily.InterNetwork:
+                    case NativeInetNetwork:
                         address = new IPAddress(_data[2..6]);
                         break;
-                    case AddressFamily.InterNetworkV6:
+                    case NativeInetNetwork6:
                         // sockaddr_in6 actually has the `flowinfo` field before the address, which is 4 bytes.
                         // Then the scope identifier follows the address, which for most intents and purposes is zero.
                         address = new IPAddress(_data[6..22], BinaryPrimitives.ReadUInt16BigEndian(_data[22..]));
@@ -78,17 +85,17 @@ namespace Tashi.ConsensusEngine
 
             set
             {
-                _addressFamily = (UInt16)value.AddressFamily;
-                
                 // Unintuitively, the port is at the beginning of the data.
                 BinaryPrimitives.WriteUInt16BigEndian(_data, (ushort) value.Port);
 
                 switch (value.AddressFamily)
                 {
                     case AddressFamily.InterNetwork:
+                        _addressFamily = NativeInetNetwork;
                         value.Address.TryWriteBytes(_data[2..], out _);
                         break;
                     case AddressFamily.InterNetworkV6:
+                        _addressFamily = NativeInetNetwork6;
                         // See above for why this starts at 6 instead of 2.
                         value.Address.TryWriteBytes(_data[6..], out _);
                         break;
@@ -102,7 +109,7 @@ namespace Tashi.ConsensusEngine
         {
             get
             {
-                if ((AddressFamily)_addressFamily != AddressFamily.InterNetworkV6) return false;
+                if (_addressFamily != NativeInetNetwork6) return false;
 
                 return
                     BinaryPrimitives.ReadUInt16BigEndian(_data) == ClientIdPort &&
@@ -125,7 +132,7 @@ namespace Tashi.ConsensusEngine
         {
             SockAddr addrOut = new SockAddr
             {
-                _addressFamily = (UInt16)AddressFamily.InterNetworkV6,
+                _addressFamily = NativeInetNetwork6,
                 _data = new byte[DataLen]
             };
             
