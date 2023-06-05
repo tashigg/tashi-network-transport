@@ -160,6 +160,11 @@ namespace Tashi.ConsensusEngine
 
             return addrOut;
         }
+
+        public override string ToString()
+        {
+            return $"{IPEndPoint} ({ClientId})";
+        }
         
         private static readonly byte[] ClientIdAddressPrefix = {
             // `fd00:/8` designates this as a locally assigned ULA (unique local address).
