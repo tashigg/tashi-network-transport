@@ -82,7 +82,7 @@ namespace Tashi.ConsensusEngine
                 {
                     conn = _externalConnections[transmit.addr];
                 }
-                catch (KeyNotFoundException _)
+                catch (KeyNotFoundException)
                 {
                     Debug.Log($"attempting to transmit on unknown connection {transmit.addr}");
                     continue;

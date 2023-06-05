@@ -43,7 +43,7 @@ namespace Tashi.ConsensusEngine
                     return Encoding.UTF8.GetString(pointer, (int)len.ToUInt64());
                 }
             }
-            catch (OverflowException _)
+            catch (OverflowException)
             {
                 return "(oversized message)";
             }
