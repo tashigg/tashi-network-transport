@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace Tashi.ConsensusEngine
 {
-    public class ExternalConnectionManager
+    public class ExternalConnectionManager : IDisposable
     {
         private Platform _platform;
         private ushort _peerNodesCount;
@@ -98,6 +98,11 @@ namespace Tashi.ConsensusEngine
 
             _externalListener?.Update(_platform);
         }
+
+        public void Dispose()
+        {
+            _externalListener?.Dispose();
+        }
     }
     
     internal class ExternalConnection
@@ -145,8 +150,8 @@ namespace Tashi.ConsensusEngine
             _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length + 8);
 
             writer.WriteULong((ulong)IPAddress.HostToNetworkOrder((long)_clientId));
-            writer.AsNativeArray().CopyFrom(packet);
-
+            using var nativeArray = writer.AsNativeArray();
+            nativeArray.CopyFrom(packet);
             _networkDriver.EndSend(writer);
         }
 
@@ -182,7 +187,7 @@ namespace Tashi.ConsensusEngine
         }
     }
 
-    internal class ExternalListener
+    internal class ExternalListener : IDisposable
     {
         private NetworkDriver _networkDriver;
 
@@ -262,6 +267,11 @@ namespace Tashi.ConsensusEngine
                     }
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _networkDriver.Dispose();
         }
     }
 }

@@ -311,7 +311,8 @@ namespace Tashi.NetworkTransport
         public override void Shutdown()
         {
             Debug.Log("TNT Shutdown");
-            _platform = null;
+            _platform?.Dispose();
+            _externalConnectionManager?.Dispose();
         }
 
         public override void Initialize(NetworkManager? networkManager = null)
