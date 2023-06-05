@@ -279,19 +279,23 @@ namespace Tashi.ConsensusEngine
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!_disposed)
+            if (_disposed)
             {
-                if (disposing)
-                {
-                    if (_platform != IntPtr.Zero)
-                    {
-                        tce_free(_platform);
-                        _platform = IntPtr.Zero;
-                    }
-                }
-
-                _disposed = true;
+                return;
             }
+
+            if (disposing)
+            {
+                // Dispose of owned, managed resources
+            }
+
+            if (_platform != IntPtr.Zero)
+            {
+                tce_free(_platform);
+                _platform = IntPtr.Zero;
+            }
+
+            _disposed = true;
         }
 
         ~Platform()
