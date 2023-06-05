@@ -203,7 +203,7 @@ namespace Tashi.ConsensusEngine
                 return null;
             }
 
-            result = tce_external_transmit_get_addr(transmit, out var sockAddr, out var sockAddrLen);
+            result = tce_external_transmit_get_addr(transmit, out var sockAddr);
 
             if (result != Result.Success)
             {
@@ -351,15 +351,14 @@ namespace Tashi.ConsensusEngine
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_addr", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_transmit_get_addr(
             IntPtr transmit,
-            out SockAddr addr,
-            out UIntPtr sockAddrLen
+            out SockAddr addr
         );
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_packet", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_transmit_get_packet(
             IntPtr transmit,
             out IntPtr packetOut,
-            out UIntPtr packetLenOut
+            out UInt64 packetLenOut
         );
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_destroy", CallingConvention = CallingConvention.Cdecl)]
