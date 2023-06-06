@@ -21,7 +21,7 @@ namespace Tashi.ConsensusEngine
         // it's 4 bytes instead of 2.
         public AddressFamily AddressFamily => NativeAddressFamily.ToAddressFamily(_addressFamily);
 
-        internal UIntPtr Len
+        internal UInt64 Len
         {
             get
             {
@@ -29,11 +29,11 @@ namespace Tashi.ConsensusEngine
                 {
                     case AddressFamily.InterNetwork:
                         // 2 bytes for `AddressFamily`, 2 bytes for the port, 4 bytes for the address.
-                        return new(2 + 2 + 4);
+                        return 2 + 2 + 4;
                     case AddressFamily.InterNetworkV6:
                         // 2 bytes for `AddressFamily`, 2 bytes for the port,
                         // 4 bytes for `flowinfo`, 16 bytes for the address, 4 bytes for the scope ID.
-                        return new(2 + 2 + 4 + 16 + 4);
+                        return 2 + 2 + 4 + 16 + 4;
                     default:
                         throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {_addressFamily}");
                 }

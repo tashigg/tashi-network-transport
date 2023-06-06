@@ -30,7 +30,7 @@ namespace Tashi.ConsensusEngine
         private ulong _clientId;
 
         // Unity Relay enforces a limit of 1400 bytes per each datagram.
-        private static UIntPtr MaxRelayDataLen = new(1400);
+        private static UInt64 MaxRelayDataLen = 1400;
 
         /// <summary>
         /// Create a new platform. It won't begin communicating with other nodes
@@ -263,7 +263,7 @@ namespace Tashi.ConsensusEngine
 
             var sockAddr = SockAddr.FromClientId(clientId);
 
-            result = tce_external_recv_commit(_platform, new((uint) readLen), ref sockAddr, sockAddr.Len);
+            result = tce_external_recv_commit(_platform, (UInt64)readLen, ref sockAddr, sockAddr.Len);
 
             if (result != Result.Success)
             {
@@ -371,7 +371,7 @@ namespace Tashi.ConsensusEngine
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_recv_prepare(
             IntPtr platform,
-            UIntPtr bufCapacity,
+            UInt64 bufCapacity,
             out IntPtr buf,
             out UInt64 len
         );
@@ -379,9 +379,9 @@ namespace Tashi.ConsensusEngine
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_commit", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_recv_commit(
             IntPtr platform,
-            UIntPtr writtenLen,
+            UInt64 writtenLen,
             ref SockAddr sockAddr,
-            UIntPtr sockAddrLen
+            UInt64 sockAddrLen
         );
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_event_free", CallingConvention = CallingConvention.Cdecl)]
