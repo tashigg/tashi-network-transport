@@ -157,10 +157,16 @@ namespace Tashi.ConsensusEngine
         {
             _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length + 8);
 
-            writer.WriteULong((ulong)IPAddress.HostToNetworkOrder((long)_clientId));
-            using var nativeArray = writer.AsNativeArray();
-            nativeArray.CopyFrom(packet);
-            _networkDriver.EndSend(writer);
+            try
+            {
+                writer.WriteULong((ulong)IPAddress.HostToNetworkOrder((long)_clientId));
+                using var nativeArray = writer.AsNativeArray();
+                nativeArray.CopyFrom(packet);
+            }
+            finally
+            {
+                _networkDriver.EndSend(writer);
+            }
         }
 
         internal void Update(Platform platform)
