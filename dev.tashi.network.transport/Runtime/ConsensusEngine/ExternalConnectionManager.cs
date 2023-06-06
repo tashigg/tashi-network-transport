@@ -216,7 +216,7 @@ namespace Tashi.ConsensusEngine
 
         internal static async Task<ExternalListener> BindAsync(int peerCount)
         {
-            var allocation = await RelayService.Instance.CreateAllocationAsync(peerCount);
+            var allocation = await RelayService.Instance.CreateAllocationAsync(peerCount + 1);
 
             var serverData = new RelayServerData(allocation, "udp");
 
