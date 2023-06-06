@@ -235,7 +235,7 @@ namespace Tashi.ConsensusEngine
                 throw new InvalidOperationException("The platform hasn't been started");
             }
 
-            var result = tce_external_recv_prepare(_platform, MaxRelayDataLen, out IntPtr buf, out UIntPtr bufLen);
+            var result = tce_external_recv_prepare(_platform, MaxRelayDataLen, out IntPtr buf, out UInt64 bufLen);
 
             if (result != Result.Success)
             {
@@ -373,7 +373,7 @@ namespace Tashi.ConsensusEngine
             IntPtr platform,
             UIntPtr bufCapacity,
             out IntPtr buf,
-            out UIntPtr len
+            out UInt64 len
         );
         
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_commit", CallingConvention = CallingConvention.Cdecl)]
