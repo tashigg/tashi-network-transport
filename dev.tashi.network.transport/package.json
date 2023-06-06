@@ -9,5 +9,12 @@
   ],
   "dependencies": {
     "com.unity.netcode.gameobjects": "1.4.0"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Local With Lobby",
+      "description": "An example of TNT over LAN, using Unity Lobby for peer discovery",
+      "path": "Samples~/Local With Lobby"
+    }
+  ]
 }
