@@ -160,8 +160,17 @@ namespace Tashi.ConsensusEngine
             try
             {
                 writer.WriteULong((ulong)IPAddress.HostToNetworkOrder((long)_clientId));
-                using var nativeArray = writer.AsNativeArray();
-                nativeArray.CopyFrom(packet);
+
+                // writer.AsNativeArray() uses the writer's entire buffer,
+                // without the internal offset.
+                // TODO: We should avoid the additional copies on the C# side eventually.
+                unsafe
+                {
+                    fixed (byte* data = packet)
+                    {
+                        writer.WriteBytes(data, packet.Length);
+                    }
+                }
             }
             finally
             {
