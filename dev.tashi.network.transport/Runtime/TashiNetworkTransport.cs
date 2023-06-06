@@ -312,6 +312,7 @@ namespace Tashi.NetworkTransport
         {
             Debug.Log("TNT Shutdown");
             _platform?.Dispose();
+            _platformStarted = false;
             _externalConnectionManager?.Dispose();
         }
 
