@@ -206,7 +206,6 @@ namespace Tashi.ConsensusEngine
         internal static async Task<ExternalListener> BindAsync(int peerCount)
         {
             var allocation = await RelayService.Instance.CreateAllocationAsync(peerCount);
-            var joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
 
             var serverData = new RelayServerData(allocation, "udp");
 
@@ -224,6 +223,8 @@ namespace Tashi.ConsensusEngine
             {
                 throw new Exception("Host client failed to listen");
             }
+
+            var joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
 
             return new ExternalListener(networkDriver: networkDriver, allocation: allocation, joinCode: joinCode);
         }

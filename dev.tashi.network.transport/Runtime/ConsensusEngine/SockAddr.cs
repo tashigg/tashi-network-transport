@@ -11,9 +11,6 @@ namespace Tashi.ConsensusEngine
     [StructLayout(LayoutKind.Sequential, Pack=8, Size=128)]
     public struct SockAddr
     {
-        private const UInt16 NativeInetNetwork = 10;
-        private const UInt16 NativeInetNetwork6 = 17;
-
         // Total struct size is 128 bytes, minus 2 bytes for AddressFamily
         private const int DataLen = 126;
         
@@ -22,21 +19,7 @@ namespace Tashi.ConsensusEngine
 
         // C#'s AddressFamily doesn't match up to the native `AF_*` values and
         // it's 4 bytes instead of 2.
-        public AddressFamily AddressFamily
-        {
-            get
-            {
-                switch (_addressFamily)
-                {
-                    case NativeInetNetwork:
-                        return AddressFamily.InterNetwork;
-                    case NativeInetNetwork6:
-                        return AddressFamily.InterNetworkV6;
-                    default:
-                        throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {_addressFamily}");
-                }
-            }
-        }
+        public AddressFamily AddressFamily => NativeAddressFamily.ToAddressFamily(_addressFamily);
 
         internal UIntPtr Len
         {
@@ -61,17 +44,17 @@ namespace Tashi.ConsensusEngine
         {
             get
             {
-                // First two bytes are the port
+                // Unintuitively, the port is at the beginning of the data.
                 UInt16 port = BinaryPrimitives.ReadUInt16BigEndian(_data);
 
                 IPAddress address;
 
-                switch (_addressFamily)
+                switch (AddressFamily)
                 {
-                    case NativeInetNetwork:
+                    case AddressFamily.InterNetwork:
                         address = new IPAddress(_data[2..6]);
                         break;
-                    case NativeInetNetwork6:
+                    case AddressFamily.InterNetworkV6:
                         // sockaddr_in6 actually has the `flowinfo` field before the address, which is 4 bytes.
                         // Then the scope identifier follows the address, which for most intents and purposes is zero.
                         address = new IPAddress(_data[6..22], BinaryPrimitives.ReadUInt16BigEndian(_data[22..]));
@@ -85,17 +68,17 @@ namespace Tashi.ConsensusEngine
 
             set
             {
-                // Unintuitively, the port is at the beginning of the data.
+                // First two bytes are the port
                 BinaryPrimitives.WriteUInt16BigEndian(_data, (ushort) value.Port);
 
                 switch (value.AddressFamily)
                 {
                     case AddressFamily.InterNetwork:
-                        _addressFamily = NativeInetNetwork;
+                        _addressFamily = NativeAddressFamily.InterNetwork;
                         value.Address.TryWriteBytes(_data[2..], out _);
                         break;
                     case AddressFamily.InterNetworkV6:
-                        _addressFamily = NativeInetNetwork6;
+                        _addressFamily = NativeAddressFamily.InterNetwork6;
                         // See above for why this starts at 6 instead of 2.
                         value.Address.TryWriteBytes(_data[6..], out _);
                         break;
@@ -109,7 +92,7 @@ namespace Tashi.ConsensusEngine
         {
             get
             {
-                if (_addressFamily != NativeInetNetwork6) return false;
+                if (_addressFamily != NativeAddressFamily.InterNetwork6) return false;
 
                 return
                     BinaryPrimitives.ReadUInt16BigEndian(_data) == ClientIdPort &&
@@ -132,7 +115,7 @@ namespace Tashi.ConsensusEngine
         {
             SockAddr addrOut = new SockAddr
             {
-                _addressFamily = NativeInetNetwork6,
+                _addressFamily = NativeAddressFamily.InterNetwork6,
                 _data = new byte[DataLen]
             };
             
@@ -187,5 +170,62 @@ namespace Tashi.ConsensusEngine
         };
 
         private const ushort ClientIdPort = 0x6767; // 'gg'
+    }
+
+    /// <summary>
+    /// A supplement for the standard `AddressFamily` enum with correct constants for the current platform.
+    /// </summary>
+    internal class NativeAddressFamily
+    {
+        /// <summary>
+        /// Corresponds to AF_INET
+        /// </summary>
+        public const UInt16 InterNetwork = 2;
+
+        /// <summary>
+        /// Corresponds to AF_INET6
+        /// </summary>
+        public static UInt16 InterNetwork6
+        {
+            get
+            {
+                // Annoyingly, `AF_INET6` has a different value on *every* platform.
+                // While the major modern operating systems all started off with copies of the Berkeley Sockets API,
+                // each of them implemented IPv6 support separately, and apparently never bothered
+                // to agree on a single constant value.
+            
+                // For once, Unity's APIs actually save us here instead of making things harder than they should be.
+                // There isn't anything close to this convenient in .NET Standard 2.1.
+                // There's https://learn.microsoft.com/en-us/dotnet/api/system.platformid?view=netstandard-2.1
+                // but the comment on the `MacOSX` constant says it's not returned on .NET Core and it instead returns
+                // `Unix`, which is absolutely useless.
+                //
+                // There's more convenient getters in newer .NET versions but that of course doesn't help us here:
+                // https://learn.microsoft.com/en-us/dotnet/api/system.operatingsystem.iswindows
+                return SystemInfo.operatingSystemFamily switch
+                {
+                    OperatingSystemFamily.Windows => 23,
+                    OperatingSystemFamily.Linux => 10,
+                    OperatingSystemFamily.MacOSX => 30,
+                    _ => throw new Exception("unsupported operating system")
+                };
+            }
+        }
+
+        public static AddressFamily ToAddressFamily(UInt16 nativeAddressFamily)
+        {
+            // Can't use `switch()` here because `InterNetwork6` isn't a constant.
+            if (nativeAddressFamily == InterNetwork)
+            {
+                return AddressFamily.InterNetwork;
+            }
+
+            if (nativeAddressFamily == InterNetwork6)
+            {
+                return AddressFamily.InterNetworkV6;
+            }
+
+            throw new ArgumentException($"unknown AddressFamily value: {nativeAddressFamily}");
+        }
     }
 }

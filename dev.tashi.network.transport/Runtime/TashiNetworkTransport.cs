@@ -353,7 +353,15 @@ namespace Tashi.NetworkTransport
                 if (!entry.PublicKey.Equals(_secretKey.PublicKey))
                 {
                     // Only attempt to connect to another peer.
-                    _externalConnectionManager.ConnectAsync(external.PublicKey.ClientId, external.RelayJoinCode);
+                    _externalConnectionManager.ConnectAsync(external.PublicKey.ClientId, external.RelayJoinCode)
+                        .ContinueWith(task =>
+                        {
+                            if (task.IsFaulted)
+                            {
+                                Debug.LogWarning($"failed to connect to {external.PublicKey.ClientId}");
+                                Debug.LogException(task.Exception);
+                            }
+                        });
                 }
 #pragma warning restore CS4014
             }
