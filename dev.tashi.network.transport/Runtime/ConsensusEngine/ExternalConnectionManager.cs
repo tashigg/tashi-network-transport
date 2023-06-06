@@ -103,10 +103,17 @@ namespace Tashi.ConsensusEngine
         public void Dispose()
         {
             _externalListener?.Dispose();
+
+            foreach (var connection in _externalConnections.Values)
+            {
+                connection.Dispose();
+            }
+
+            _externalConnections.Clear();
         }
     }
     
-    internal class ExternalConnection
+    internal class ExternalConnection : IDisposable
     {
         // Because the `NetworkSettings` we pass to the `NetworkDriver` has the host allocation ID,
         // we actually need a separate instance of `NetworkDriver` *per* peer.
@@ -185,6 +192,11 @@ namespace Tashi.ConsensusEngine
                         break;
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _networkDriver.Dispose();
         }
     }
 
