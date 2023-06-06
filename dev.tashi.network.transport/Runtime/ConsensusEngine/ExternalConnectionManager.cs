@@ -44,7 +44,8 @@ namespace Tashi.ConsensusEngine
             _bindStarted = true;
 
             _externalListener = await ExternalListener.BindAsync(_peerNodesCount);
-            return _externalListener.JoinCode;
+
+            return await _externalListener.GetJoinCode();
         }
 
         /**
@@ -192,15 +193,13 @@ namespace Tashi.ConsensusEngine
         private NetworkDriver _networkDriver;
 
         private Allocation _allocation;
-        internal string JoinCode;
 
         private readonly List<NetworkConnection> _connections = new();
 
-        private ExternalListener(NetworkDriver networkDriver, Allocation allocation, string joinCode)
+        private ExternalListener(NetworkDriver networkDriver, Allocation allocation)
         {
             _networkDriver = networkDriver;
             _allocation = allocation;
-            JoinCode = joinCode;
         }
 
         internal static async Task<ExternalListener> BindAsync(int peerCount)
@@ -223,10 +222,15 @@ namespace Tashi.ConsensusEngine
             {
                 throw new Exception("Host client failed to listen");
             }
+            
+            networkDriver.ScheduleUpdate().Complete();
 
-            var joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+            return new ExternalListener(networkDriver: networkDriver, allocation: allocation);
+        }
 
-            return new ExternalListener(networkDriver: networkDriver, allocation: allocation, joinCode: joinCode);
+        internal async Task<String> GetJoinCode()
+        {
+            return await RelayService.Instance.GetJoinCodeAsync(_allocation.AllocationId);
         }
 
         internal void Update(Platform platform)
