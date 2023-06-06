@@ -3,3 +3,4 @@
 *.dylib
 *.sln
 *.so
+*.blob

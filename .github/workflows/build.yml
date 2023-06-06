@@ -58,7 +58,7 @@ jobs:
           echo "TNT_ARCHIVE_NAME=$archive_name" >> $GITHUB_ENV
           sed -i "s/\"version\":.*/\"version\": \"$TNT_VERSION\",/" dev.tashi.network.transport/package.json
           mv dev.tashi.network.transport package
-          tar czf $archive_name package
+          tar hczf $archive_name package
 
       # TODO: Include the Tashi license
       - name: Upload the TNT artifact
