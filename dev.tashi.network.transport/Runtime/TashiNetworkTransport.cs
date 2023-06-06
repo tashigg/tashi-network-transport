@@ -359,7 +359,7 @@ namespace Tashi.NetworkTransport
                         {
                             if (task.IsFaulted)
                             {
-                                Debug.LogWarning($"failed to connect to {external.PublicKey.ClientId}");
+                                Debug.LogWarning($"failed to connect to {external.PublicKey.ClientId} with join code {external.RelayJoinCode}");
                                 Debug.LogException(task.Exception);
                             }
                         });

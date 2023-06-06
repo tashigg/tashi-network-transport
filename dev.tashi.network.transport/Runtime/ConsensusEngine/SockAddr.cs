@@ -9,7 +9,7 @@ using UnityEngine;
 namespace Tashi.ConsensusEngine
 {
     [StructLayout(LayoutKind.Sequential, Pack=8, Size=128)]
-    public struct SockAddr
+    public struct SockAddr : IEquatable<SockAddr>
     {
         // Total struct size is 128 bytes, minus 2 bytes for AddressFamily
         private const int DataLen = 126;
@@ -170,6 +170,26 @@ namespace Tashi.ConsensusEngine
         };
 
         private const ushort ClientIdPort = 0x6767; // 'gg'
+
+        public bool Equals(SockAddr other)
+        {
+            return _addressFamily == other._addressFamily && _data.SequenceEqual(other._data);
+        }
+
+        public override int GetHashCode()
+        {
+            var hasher = new HashCode();
+
+            hasher.Add(_addressFamily);
+
+            // `hashCode.AddBytes` is unavailable
+            foreach (var b in _data)
+            {
+                hasher.Add(b);
+            }
+
+            return hasher.ToHashCode();
+        }
     }
 
     /// <summary>
