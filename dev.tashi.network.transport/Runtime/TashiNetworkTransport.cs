@@ -22,12 +22,12 @@ namespace Tashi.NetworkTransport
 
         public delegate void OnPlatformInitHandler(object sender);
 
+        public bool SessionHasStarted { get; private set; }
         public event OnPlatformInitHandler? OnPlatformInit;
 
         private Platform? _platform;
         private SecretKey _secretKey;
         private List<AddressBookEntry> _addressBook = new();
-        private bool _platformStarted;
         private bool _isServer;
         private PublicKey? _hostPublicKey;
 
@@ -195,7 +195,7 @@ namespace Tashi.NetworkTransport
             payload = default;
             receiveTime = Time.realtimeSinceStartup;
 
-            if (!_platformStarted)
+            if (!SessionHasStarted)
             {
                 return NetworkEvent.Nothing;
             }
@@ -312,7 +312,7 @@ namespace Tashi.NetworkTransport
         {
             Debug.Log("TNT Shutdown");
             _platform?.Dispose();
-            _platformStarted = false;
+            SessionHasStarted = false;
             _externalConnectionManager?.Dispose();
         }
 
@@ -385,7 +385,7 @@ namespace Tashi.NetworkTransport
 
             Debug.Log($"Discovered {_addressBook.Count} of {Config.TotalNodes}");
 
-            if (_addressBook.Count == Config.TotalNodes && !_platformStarted)
+            if (_addressBook.Count == Config.TotalNodes && !SessionHasStarted)
             {
                 StartSyncing();
             }
@@ -403,7 +403,7 @@ namespace Tashi.NetworkTransport
             try
             {
                 _platform.Start(_addressBook);
-                _platformStarted = true;
+                SessionHasStarted = true;
 
                 // TAS-76
                 _platform.Send(Encoding.ASCII.GetBytes("Hi"));
