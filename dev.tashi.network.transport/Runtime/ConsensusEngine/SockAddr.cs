@@ -146,7 +146,7 @@ namespace Tashi.ConsensusEngine
 
         public override string ToString()
         {
-            return $"{IPEndPoint} ({ClientId})";
+            return $"{IPEndPoint} (clientId = {ClientId})";
         }
         
         private static readonly byte[] ClientIdAddressPrefix = {

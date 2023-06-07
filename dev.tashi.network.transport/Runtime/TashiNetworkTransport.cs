@@ -348,7 +348,7 @@ namespace Tashi.NetworkTransport
                     return;
                 }
 
-                Debug.Log($"Added node {external.RelayJoinCode}");
+                Debug.Log($"Added node {external.PublicKey.SyntheticSockAddr} with join code {external.RelayJoinCode}");
 
 #pragma warning disable CS4014
                 if (!entry.PublicKey.Equals(_secretKey.PublicKey))
