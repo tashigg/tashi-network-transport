@@ -4,3 +4,4 @@
 *.sln
 *.so
 *.dll.meta
+*.blob

@@ -9,5 +9,12 @@
     "com.unity.services.relay": "1.0.3",
     "com.unity.transport": "1.3.4",
     "com.unity.netcode.gameobjects": "1.4.0"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Local With Lobby",
+      "description": "An example of TNT over LAN, using Unity Lobby for peer discovery",
+      "path": "Samples~/Local With Lobby"
+    }
+  ]
 }
