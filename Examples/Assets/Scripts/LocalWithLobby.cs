@@ -179,7 +179,7 @@ public class LocalWithLobby : MonoBehaviour
 
     private async void Update()
     {
-        if (!string.IsNullOrEmpty(_lobbyId) && Time.realtimeSinceStartup >= _nextLobbyRefresh)
+        if (!string.IsNullOrEmpty(_lobbyId) && !NetworkTransport.SessionHasStarted && Time.realtimeSinceStartup >= _nextLobbyRefresh)
         {
             _nextLobbyRefresh = Time.realtimeSinceStartup + 10;
 
