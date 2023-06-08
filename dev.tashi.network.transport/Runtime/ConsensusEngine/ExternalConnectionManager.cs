@@ -228,11 +228,14 @@ namespace Tashi.ConsensusEngine
                         platform.ExternalReceive(sockAddr, stream);
                         break;
                     case NetworkEvent.Type.Connect:
-                        Debug.Log($"connected to {_remoteClientId}");
+                        Debug.Log($"Connected to {_remoteClientId}");
+                        // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Connect,
                         _connected = true;
                         break;
                     case NetworkEvent.Type.Disconnect:
-                        // TODO: handle disconnection
+                        Debug.Log($"Disconnected from {_remoteClientId}");
+                        // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Disconnect,
+                        _connected = false;
                         break;
                 }
             }
@@ -321,9 +324,12 @@ namespace Tashi.ConsensusEngine
                             platform.ExternalReceive(sockAddr, stream);
                             break;
                         case NetworkEvent.Type.Connect:
+                            Debug.Log($"A client connected.");
+                            // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Connect,
                             break;
                         case NetworkEvent.Type.Disconnect:
-                            // TODO: handle disconnection
+                            Debug.Log($"A client disconnected.");
+                            // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Disconnect,
                             break;
                     }
                 }
