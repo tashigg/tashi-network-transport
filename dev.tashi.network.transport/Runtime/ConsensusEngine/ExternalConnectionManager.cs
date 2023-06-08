@@ -63,6 +63,8 @@ namespace Tashi.ConsensusEngine
             var connection = await ExternalConnection.ConnectAsync(_localClientId, remoteClientId, joinCode);
             
             _externalConnections.Add(sockAddr, connection);
+            
+            Debug.Log($"opening connection to {remoteClientId}");
         }
 
         public void Update()
@@ -154,6 +156,8 @@ namespace Tashi.ConsensusEngine
 
             var networkConnection = networkDriver.Connect();
 
+            networkDriver.ScheduleUpdate();
+
             return new ExternalConnection(localClientId, remoteClientId, networkDriver: networkDriver,
                 networkConnection: networkConnection, connected: false);
         }
@@ -172,7 +176,7 @@ namespace Tashi.ConsensusEngine
             
             _networkDriver.ScheduleUpdate().Complete();
             
-            _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length + 8);
+            _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length);
 
             try
             {
@@ -195,7 +199,12 @@ namespace Tashi.ConsensusEngine
             {
                 Debug.Log("exception in ExternalConnection.Send()");
                 Debug.LogException(e);
+                return;
             }
+            
+            Debug.Log($"sent {packet.Length} bytes to {_remoteClientId}");
+
+            _networkDriver.ScheduleUpdate();
         }
 
         internal void Update(Platform platform)
@@ -221,6 +230,7 @@ namespace Tashi.ConsensusEngine
                         platform.ExternalReceive(sockAddr, stream);
                         break;
                     case NetworkEvent.Type.Connect:
+                        Debug.Log($"connected to {_remoteClientId}");
                         _connected = true;
                         break;
                     case NetworkEvent.Type.Disconnect:
