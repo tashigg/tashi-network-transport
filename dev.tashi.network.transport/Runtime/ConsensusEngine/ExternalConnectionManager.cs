@@ -29,9 +29,9 @@ namespace Tashi.ConsensusEngine
         public ExternalConnectionManager(Platform platform, ushort totalNodes, ulong localClientId)
         {
             Debug.Assert(totalNodes > 0);
-            
+
             _platform = platform;
-            _peerNodesCount = (ushort) (totalNodes - 1);
+            _peerNodesCount = (ushort)(totalNodes - 1);
             _localClientId = localClientId;
         }
 
@@ -57,13 +57,13 @@ namespace Tashi.ConsensusEngine
         public async Task ConnectAsync(ulong remoteClientId, string joinCode)
         {
             var sockAddr = SockAddr.FromClientId(remoteClientId);
-            
+
             if (_externalConnections.ContainsKey(sockAddr)) return;
 
             var connection = await ExternalConnection.ConnectAsync(_localClientId, remoteClientId, joinCode);
-            
+
             _externalConnections.Add(sockAddr, connection);
-            
+
             Debug.Log($"opening connection to {remoteClientId}");
         }
 
@@ -73,7 +73,7 @@ namespace Tashi.ConsensusEngine
             {
                 conn.Value.Update(_platform);
             }
-            
+
             while (true)
             {
                 var maybeTransmit = _platform.GetExternalTransmit();
@@ -117,7 +117,7 @@ namespace Tashi.ConsensusEngine
             _externalConnections.Clear();
         }
     }
-    
+
     internal class ExternalConnection : IDisposable
     {
         // Because the `NetworkSettings` we pass to the `NetworkDriver` has the host allocation ID,
@@ -129,26 +129,25 @@ namespace Tashi.ConsensusEngine
         private readonly ulong _localClientId;
         private readonly ulong _remoteClientId;
 
-        private ExternalConnection(ulong localClientId, ulong remoteClientId, NetworkDriver networkDriver, NetworkConnection networkConnection, bool connected)
+        private ExternalConnection(ulong localClientId, ulong remoteClientId, NetworkDriver networkDriver, NetworkConnection networkConnection)
         {
             _localClientId = localClientId;
             _remoteClientId = remoteClientId;
             _networkDriver = networkDriver;
             _networkConnection = networkConnection;
-            _connected = connected;
         }
 
         internal static async Task<ExternalConnection> ConnectAsync(ulong localClientId, ulong remoteClientId, string joinCode)
         {
             var allocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
-            
+
             var serverData = new RelayServerData(allocation, "udp");
 
             var networkSettings = new NetworkSettings();
             networkSettings.WithRelayParameters(ref serverData);
 
             var networkDriver = NetworkDriver.Create(networkSettings);
-            
+
             if (networkDriver.Bind(NetworkEndPoint.AnyIpv4) != 0)
             {
                 throw new Exception("failed to bind to 0.0.0.0:0");
@@ -158,8 +157,7 @@ namespace Tashi.ConsensusEngine
 
             networkDriver.ScheduleUpdate();
 
-            return new ExternalConnection(localClientId, remoteClientId, networkDriver: networkDriver,
-                networkConnection: networkConnection, connected: false);
+            return new ExternalConnection(localClientId, remoteClientId, networkDriver, networkConnection);
         }
 
         internal void Send(byte[] packet)
@@ -173,9 +171,9 @@ namespace Tashi.ConsensusEngine
             // This does mean we drop packets initially but TCE should be able to just figure that out and go into
             // a backoff loop until they start going through.
             if (!_connected) return;
-            
+
             _networkDriver.ScheduleUpdate().Complete();
-            
+
             _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length);
 
             try
@@ -201,7 +199,7 @@ namespace Tashi.ConsensusEngine
                 Debug.LogException(e);
                 return;
             }
-            
+
             Debug.Log($"sent {packet.Length} bytes to {_remoteClientId}");
 
             _networkDriver.ScheduleUpdate();
@@ -223,7 +221,7 @@ namespace Tashi.ConsensusEngine
                         var clientId = stream.ReadULong();
 
                         // And this method isn't overloaded for unsigned types, sigh.
-                        clientId = (ulong) IPAddress.NetworkToHostOrder((long)clientId);
+                        clientId = (ulong)IPAddress.NetworkToHostOrder((long)clientId);
 
                         var sockAddr = SockAddr.FromClientId(clientId);
 
@@ -253,7 +251,7 @@ namespace Tashi.ConsensusEngine
         private Allocation _allocation;
 
         private readonly List<NetworkConnection> _connections = new();
-    
+
         private ExternalListener(NetworkDriver networkDriver, Allocation allocation)
         {
             _networkDriver = networkDriver;
@@ -270,17 +268,17 @@ namespace Tashi.ConsensusEngine
             networkSettings.WithRelayParameters(ref serverData);
 
             var networkDriver = NetworkDriver.Create(networkSettings);
-            
+
             if (networkDriver.Bind(NetworkEndPoint.AnyIpv4) != 0)
             {
                 throw new Exception("failed to bind to 0.0.0.0:0");
             }
-            
+
             if (networkDriver.Listen() != 0)
             {
                 throw new Exception("Host client failed to listen");
             }
-            
+
             networkDriver.ScheduleUpdate().Complete();
 
             return new ExternalListener(networkDriver: networkDriver, allocation: allocation);
