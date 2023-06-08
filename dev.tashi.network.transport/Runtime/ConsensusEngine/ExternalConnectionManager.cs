@@ -170,7 +170,7 @@ namespace Tashi.ConsensusEngine
             // a backoff loop until they start going through.
             if (!_connected) return;
 
-            _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length);
+            _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length + 8);
 
             try
             {
