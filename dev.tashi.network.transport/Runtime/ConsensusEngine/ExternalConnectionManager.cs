@@ -155,8 +155,6 @@ namespace Tashi.ConsensusEngine
 
             var networkConnection = networkDriver.Connect();
 
-            networkDriver.ScheduleUpdate();
-
             return new ExternalConnection(localClientId, remoteClientId, networkDriver, networkConnection);
         }
 
@@ -171,8 +169,6 @@ namespace Tashi.ConsensusEngine
             // This does mean we drop packets initially but TCE should be able to just figure that out and go into
             // a backoff loop until they start going through.
             if (!_connected) return;
-
-            _networkDriver.ScheduleUpdate().Complete();
 
             _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length);
 
@@ -201,8 +197,6 @@ namespace Tashi.ConsensusEngine
             }
 
             Debug.Log($"sent {packet.Length} bytes to {_remoteClientId}");
-
-            _networkDriver.ScheduleUpdate();
         }
 
         internal void Update(Platform platform)
@@ -281,8 +275,6 @@ namespace Tashi.ConsensusEngine
             {
                 throw new Exception("Host client failed to listen");
             }
-
-            networkDriver.ScheduleUpdate().Complete();
 
             return new ExternalListener(networkDriver: networkDriver, allocation: allocation);
         }

@@ -194,8 +194,7 @@ namespace Tashi.NetworkTransport
             clientId = default;
             payload = default;
             receiveTime = Time.realtimeSinceStartup;
-            
-            
+
             if (!SessionHasStarted)
             {
                 return NetworkEvent.Nothing;
@@ -208,6 +207,11 @@ namespace Tashi.NetworkTransport
             }
             
             return NetworkEvent.Nothing;
+        }
+
+        public void Update()
+        {
+            _externalConnectionManager?.Update();
         }
 
         public override bool StartClient()
