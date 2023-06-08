@@ -191,13 +191,29 @@ namespace Tashi.NetworkTransport
         public override NetworkEvent PollEvent(out ulong clientId, out ArraySegment<byte> payload,
             out float receiveTime)
         {
+            // Calling `externalConnectionManager.Update()` here leads to exceptions being thrown,
+            // because it seems to want to poll for initial events outside of the update loop.
+            //
+            // However, we didn't really use this method as intended anyways because we always returned
+            // `NetworkEvent.Nothing`. We instead call `InvokeOnTransportEvent()`.
+            //
+            // There isn't really any good advice for implementing an event-driven `NetworkTransport` in the
+            // documentation, but this is helped by the revelation that `NetworkTransport` inherits from
+            // `MonoBehavior`, so we *can* just override `Update()`, which I think was the intended outcome.
+            //
+            // The runtime definitely appears to call `.Update()` and it eliminates the exceptions
+            // that were being thrown.
             clientId = default;
             payload = default;
             receiveTime = Time.realtimeSinceStartup;
+            return NetworkEvent.Nothing;
+        }
 
+        public void Update()
+        {
             if (!SessionHasStarted)
             {
-                return NetworkEvent.Nothing;
+                return;
             }
             
             _externalConnectionManager?.Update();
@@ -205,8 +221,6 @@ namespace Tashi.NetworkTransport
             while (ProcessEvent())
             {
             }
-
-            return NetworkEvent.Nothing;
         }
 
         public override bool StartClient()
@@ -246,7 +260,7 @@ namespace Tashi.NetworkTransport
             {
                 Debug.Log("binding in external mode");
                 
-                var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, Config.TotalNodes);
+                var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, Config.TotalNodes, _secretKey.PublicKey.ClientId);
                 
                 // C#'s task system is markedly different from Rust's: in Rust, the consumer of a `Future`
                 // is responsible for driving it forward unless explicitly spawned into a runtime,

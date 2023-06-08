@@ -1,32 +1,47 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
 
 namespace Tashi.ConsensusEngine
 {
-    public class NativeLogger
+    public static class NativeLogger
     {
-        public static void Init(string envFilter)
+        private static LogDelegateHolder? _logDelegateHolder;
+        
+        public static void Init()
         {
-            Result result;
+            // Important: if there's an existing delegate holder, tell it not to clear the log functions
+            // in its finalizer as we're going to be replacing them anyway.
+            //
+            // Otherwise, when the GC finalizes the object sometime after this method returns,
+            // it will clear the log functions we just set.
+            _logDelegateHolder?.Forget();
 
             unsafe
             {
-                result = tce_set_log_functions(
-                    envFilter,
+                // SAFETY: we use a class that implements `IDisposable` to ensure we clear the log function pointers
+                // before they are invalidated. This generally only matters when running the application in Unity,
+                // as it may load and unload this class every time the application is run within the editor,
+                // but the TCE dynamic library will remain loaded in the process and so may try to invoke a function
+                // pointer from a previous run, which will immediately segfault or worse.
+                _logDelegateHolder = new LogDelegateHolder(
                     // SAFETY: we must ensure `pointer` doesn't escape the function call, which it won't here.
-                    // We must also be sure to *only* use static delegates here because delegates with captures
-                    // will throw `NullReferenceException`s.
-                    static (pointer, len) => Debug.Log(DecodeUtf8String(pointer, len)),
-                    static(pointer, len) => Debug.LogWarning(DecodeUtf8String(pointer, len)),
-                    static(pointer, len) => Debug.LogError(DecodeUtf8String(pointer, len))
-                );
+                    log: static (pointer, len) => Debug.Log(DecodeUtf8String(pointer, len)),
+                    logWarning: static(pointer, len) => Debug.LogWarning(DecodeUtf8String(pointer, len)),
+                    logError: static(pointer, len) => Debug.LogError(DecodeUtf8String(pointer, len))
+                ); 
             }
+        }
+
+        public static void SetFilter(string logFilter)
+        {
+            var result = tce_log_set_filter(logFilter);
 
             if (result != Result.Success)
             {
-                throw new InvalidOperationException($"error initializing native logger: {result}");
+                throw new Exception($"error from tce_log_set_filter: {result}");
             }
         }
 
@@ -52,13 +67,56 @@ namespace Tashi.ConsensusEngine
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private unsafe delegate void LogDelegate(byte* utf8String, UIntPtr len);
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_set_log_functions", CallingConvention = CallingConvention.Cdecl)]
-        static extern Result tce_set_log_functions
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_log_set_functions", CallingConvention = CallingConvention.Cdecl)]
+        static extern Result tce_log_set_functions
         (
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string envFilter,
-            LogDelegate log,
-            LogDelegate logWarning,
-            LogDelegate logError
+            LogDelegate? log,
+            LogDelegate? logWarning,
+            LogDelegate? logError
         );
+        
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_log_set_filter", CallingConvention = CallingConvention.Cdecl)]
+        static extern Result tce_log_set_filter
+        (
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string logFilter
+        );
+
+        private class LogDelegateHolder: IDisposable
+        {
+            // ReSharper disable PrivateFieldCanBeConvertedToLocalVariable
+            private readonly LogDelegate _log;
+            private readonly LogDelegate _logWarning;
+            private readonly LogDelegate _logError;
+            // ReSharper restore PrivateFieldCanBeConvertedToLocalVariable
+
+            private bool _clearOnDispose = true;
+
+            public LogDelegateHolder(LogDelegate log, LogDelegate logWarning, LogDelegate logError)
+            {
+                _log = log;
+                _logWarning = logWarning;
+                _logError = logError;
+
+                tce_log_set_functions(_log, _logWarning, _logError);
+            }
+
+            public void Forget()
+            {
+                _clearOnDispose = false;
+            }
+
+            public void Dispose()
+            {
+                // `.Dispose()` may be called multiple times but it must be idempotent.
+                if (_clearOnDispose)
+                {
+                    // SAFETY: we must clear the function pointers in TCE before they are invalidated.
+                    // This is thread-safe.
+                    tce_log_set_functions(null, null, null);
+
+                    _clearOnDispose = false;
+                }
+            }
+        }
     }
 }

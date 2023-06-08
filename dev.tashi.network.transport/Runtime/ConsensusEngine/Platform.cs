@@ -32,6 +32,23 @@ namespace Tashi.ConsensusEngine
         // Unity Relay enforces a limit of 1400 bytes per each datagram.
         private static UInt64 MaxRelayDataLen = 1400;
 
+        static Platform()
+        {
+            // Initialize logging upon class load.
+            try
+            {
+                NativeLogger.Init();
+                // The ordering of these two doesn't particularly matter.
+                NativeLogger.SetFilter("tashi_consensus_engine=info");
+                Debug.Log("logging initialized");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("exception from NativeLogger");
+                Debug.LogException(e);
+            }
+        }
+
         /// <summary>
         /// Create a new platform. It won't begin communicating with other nodes
         /// until the Start method is called.
@@ -39,18 +56,6 @@ namespace Tashi.ConsensusEngine
         ///
         public Platform(NetworkMode mode, IPEndPoint bindEndPoint, TimeSpan syncInterval, SecretKey secretKey)
         {
-            // Initialize logging.
-            try
-            {
-                NativeLogger.Init("tashi_consensus_engine=info");
-                Debug.Log("logging initialized");
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("exception from NativeLogger.Init()");
-                Debug.LogException(e);
-            }
-            
             _clientId = secretKey.PublicKey.ClientId;
             
             _platform = tce_init(
@@ -230,6 +235,8 @@ namespace Tashi.ConsensusEngine
 
         internal void ExternalReceive(SockAddr addr, DataStreamReader stream)
         {
+            Debug.Log($"ExternalReceive: received {stream.Length} bytes from {addr}");
+            
             if (!_started)
             {
                 throw new InvalidOperationException("The platform hasn't been started");
@@ -245,15 +252,8 @@ namespace Tashi.ConsensusEngine
             // Kind of baffling that this is actually necessary.
             // It should just take a capacity and return the number of bytes written.
             var bytesAvailable = stream.Length - stream.GetBytesRead();
-
-            if (bytesAvailable < 8)
-            {
-                Debug.Log("received message shorter than 8 bytes");
-            }
-
-            var clientId = stream.ReadULong();
-
-            var readLen = Math.Min(bytesAvailable - 8, (int) bufLen);
+            
+            var readLen = Math.Min(bytesAvailable, (int) bufLen);
             
             unsafe
             {
@@ -261,9 +261,7 @@ namespace Tashi.ConsensusEngine
                 stream.ReadBytes((byte*) buf, readLen);
             }
 
-            var sockAddr = SockAddr.FromClientId(clientId);
-
-            result = tce_external_recv_commit(_platform, (UInt64)readLen, ref sockAddr, sockAddr.Len);
+            result = tce_external_recv_commit(_platform, (UInt64)readLen, ref addr, addr.Len);
 
             if (result != Result.Success)
             {
