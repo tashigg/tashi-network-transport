@@ -231,11 +231,9 @@ namespace Tashi.ConsensusEngine
                         break;
                     case NetworkEvent.Type.Connect:
                         Debug.Log($"Connected to {_remoteClientId}");
-                        // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Connect,
                         break;
                     case NetworkEvent.Type.Disconnect:
                         Debug.Log($"Disconnected from {_remoteClientId}");
-                        // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Disconnect,
                         break;
                 }
             }
@@ -323,11 +321,9 @@ namespace Tashi.ConsensusEngine
                             break;
                         case NetworkEvent.Type.Connect:
                             Debug.Log($"A client connected.");
-                            // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Connect,
                             break;
                         case NetworkEvent.Type.Disconnect:
                             Debug.Log($"A client disconnected.");
-                            // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Disconnect,
                             break;
                     }
                 }
