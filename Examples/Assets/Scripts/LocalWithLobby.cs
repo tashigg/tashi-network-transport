@@ -48,7 +48,7 @@ public class LocalWithLobby : MonoBehaviour
         {
             AuthenticationService.Instance.SignedIn += delegate
             {
-                statusText.text = $"Signed in as {PlayerId}";
+                UpdateStatusText();
                 profileMenu.enabled = false;
                 lobbyMenu.enabled = true;
             };
@@ -66,7 +66,7 @@ public class LocalWithLobby : MonoBehaviour
     {
         lobbyMenu.enabled = false;
 
-        Debug.Log("Create");
+        Debug.Log("Create lobby");
 
         NetworkManager.Singleton.StartServer();
 
@@ -84,7 +84,7 @@ public class LocalWithLobby : MonoBehaviour
     {
         lobbyMenu.enabled = false;
 
-        Debug.Log("Join");
+        Debug.Log("Join lobby");
 
         NetworkManager.Singleton.StartClient();
 
@@ -117,6 +117,7 @@ public class LocalWithLobby : MonoBehaviour
         NetworkManager.Singleton.OnClientConnectedCallback += delegate(ulong clientId)
         {
             _clientCount += 1;
+            UpdateStatusText();
             Debug.Log($"Client {clientId} connected");
         };
     }
@@ -141,9 +142,18 @@ public class LocalWithLobby : MonoBehaviour
         await LobbyService.Instance.UpdatePlayerAsync(_lobbyId, PlayerId, options);
     }
 
-    void ShowClientsConnected()
+    void UpdateStatusText()
     {
-        statusText.text = $"{_clientCount + 1} / {NetworkTransport.Config.TotalNodes} clients are connected";
+        if (!string.IsNullOrEmpty(PlayerId))
+        {
+            statusText.text = $"Signed in as {PlayerId}";
+        }
+        else
+        {
+            statusText.text = "";
+        }
+
+        statusText.text += $"\n{_clientCount} / {NetworkTransport.Config.TotalNodes - 1} peer connections";
     }
 
     private async Task ApplyPlayerDataFromLobby()
@@ -173,8 +183,6 @@ public class LocalWithLobby : MonoBehaviour
 
             NetworkTransport.AddAddressBookEntry(entry, player.Id == lobby.HostId);
         }
-
-        ShowClientsConnected();
     }
 
     private async void Update()
