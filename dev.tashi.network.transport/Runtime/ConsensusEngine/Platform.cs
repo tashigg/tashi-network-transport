@@ -236,16 +236,12 @@ namespace Tashi.ConsensusEngine
         internal void ExternalReceive(SockAddr addr, DataStreamReader stream)
         {
             Debug.Log($"ExternalReceive: received {stream.Length} bytes from {addr}");
-            
-            if (!_started)
-            {
-                throw new InvalidOperationException("The platform hasn't been started");
-            }
 
             var result = tce_external_recv_prepare(_platform, MaxRelayDataLen, out IntPtr buf, out UInt64 bufLen);
 
             if (result != Result.Success)
             {
+                Debug.LogWarning($"error from tce_external_recv_prepare: {result}");
                 return;
             }
 
@@ -265,7 +261,7 @@ namespace Tashi.ConsensusEngine
 
             if (result != Result.Success)
             {
-                Debug.Log($"error from tce_external_recv_commit: {result}");
+                Debug.LogWarning($"error from tce_external_recv_commit: {result}");
             }
         }
 
