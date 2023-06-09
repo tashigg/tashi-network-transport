@@ -132,9 +132,10 @@ namespace Tashi.ConsensusEngine
         private NetworkDriver _networkDriver;
         private NetworkConnection _networkConnection;
 
-        private bool _connected;
         private readonly ulong _localClientId;
         private readonly ulong _remoteClientId;
+
+        private NetworkConnection.State State => _networkConnection.GetState(_networkDriver);
 
         private ExternalConnection(ulong localClientId, ulong remoteClientId, NetworkDriver networkDriver, NetworkConnection networkConnection)
         {
@@ -175,7 +176,7 @@ namespace Tashi.ConsensusEngine
             //
             // This does mean we drop packets initially but TCE should be able to just figure that out and go into
             // a backoff loop until they start going through.
-            if (!_connected) return;
+            if (State != NetworkConnection.State.Connected) return;
 
             _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length + 8);
 
@@ -231,12 +232,10 @@ namespace Tashi.ConsensusEngine
                     case NetworkEvent.Type.Connect:
                         Debug.Log($"Connected to {_remoteClientId}");
                         // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Connect,
-                        _connected = true;
                         break;
                     case NetworkEvent.Type.Disconnect:
                         Debug.Log($"Disconnected from {_remoteClientId}");
                         // TODO: InvokeOnTransportEvent(NetcodeNetworkEvent.Disconnect,
-                        _connected = false;
                         break;
                 }
             }
