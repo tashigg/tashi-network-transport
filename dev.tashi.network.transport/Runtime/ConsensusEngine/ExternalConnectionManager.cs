@@ -24,6 +24,8 @@ namespace Tashi.ConsensusEngine
         private bool _bindStarted;
         private ExternalListener? _externalListener;
 
+        private readonly HashSet<SockAddr> _pendingConnections = new();
+
         private readonly Dictionary<SockAddr, ExternalConnection> _externalConnections = new();
 
         public ExternalConnectionManager(Platform platform, ushort totalNodes, ulong localClientId)
@@ -60,9 +62,10 @@ namespace Tashi.ConsensusEngine
 
             if (_externalConnections.ContainsKey(sockAddr)) return;
 
+            _pendingConnections.Add(sockAddr);
             var connection = await ExternalConnection.ConnectAsync(_localClientId, remoteClientId, joinCode);
-
             _externalConnections.Add(sockAddr, connection);
+            _pendingConnections.Remove(sockAddr);
 
             Debug.Log($"opening connection to {remoteClientId}");
         }
@@ -95,7 +98,11 @@ namespace Tashi.ConsensusEngine
                 }
                 catch (KeyNotFoundException)
                 {
-                    Debug.Log($"attempting to transmit on unknown connection {transmit.addr}");
+                    if (!_pendingConnections.Contains(transmit.addr))
+                    {
+                        Debug.Log($"Attempting to transmit on unknown connection {transmit.addr}");
+                    }
+
                     continue;
                 }
 
