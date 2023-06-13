@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   included in the distributed package.
 * An example project which uses the sample script is included in the TNT git
   repo.
+* `TashiNetworkTransport` now has a `SessionHasStarted` property.
+* Unity Relay is now supported, which enables communication over WAN. This is
+  intended to be a temporary measure until Tashi Relay is released.
+
+### Changed
+
+* `SecretKey.GetPublicKey()` has become a property named `PublicKey`.
 
 ## [0.1.0]
 

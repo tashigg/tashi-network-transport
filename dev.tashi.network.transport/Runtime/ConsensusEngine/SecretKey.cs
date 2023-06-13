@@ -39,7 +39,7 @@ namespace Tashi.ConsensusEngine
             var result = tce_secret_key_generate(der, (UInt32)der.Length, ref actualLen);
             if (result != Result.Success || actualLen != der.Length)
             {
-                throw new Exception("Failed to generate a secret key");
+                throw new Exception($"Failed to generate a secret key: {result}");
             }
 
             return new SecretKey(der);
@@ -69,7 +69,7 @@ namespace Tashi.ConsensusEngine
 
                     if (result != Result.Success || actualLen != der.Length)
                     {
-                        throw new Exception("Failed to get the public key from the secret key");
+                        throw new Exception($"Failed to get the public key from the secret key: {result}");
                     }
 
                     _publicKey = new PublicKey(der);

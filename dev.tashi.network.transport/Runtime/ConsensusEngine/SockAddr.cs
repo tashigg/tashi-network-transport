@@ -23,32 +23,12 @@ namespace Tashi.ConsensusEngine
         {
             IPEndPoint = ipEndPoint;
         }
-        
+
         // C#'s AddressFamily doesn't match up to the native `AF_*` values and
         // it's 4 bytes instead of 2.
         public AddressFamily AddressFamily => NativeAddressFamily.ToAddressFamily(_addressFamily);
 
         internal UInt64 Len => 128;
-        
-        // internal UInt64 Len
-        // {
-        //     get
-        //     {
-        //         switch (AddressFamily)
-        //         {
-        //             case AddressFamily.InterNetwork:
-        //                 // 2 bytes for `AddressFamily`, 2 bytes for the port, 4 bytes for the address.
-        //                 return 2 + 2 + 4;
-        //             case AddressFamily.InterNetworkV6:
-        //                 // 2 bytes for `AddressFamily`, 2 bytes for the port,
-        //                 // 4 bytes for `flowinfo`, 16 bytes for the address, 4 bytes for the scope ID.
-        //                 return 2 + 2 + 4 + 16 + 4;
-        //             default:
-        //                 throw new InvalidOperationException(
-        //                     $"SockAddr.AddressFamily is not an IP subtype: {_addressFamily}");
-        //         }
-        //     }
-        // }
 
         public IPEndPoint IPEndPoint
         {
@@ -105,7 +85,7 @@ namespace Tashi.ConsensusEngine
                 // This checks that the address is IPv6 and that it has our designated prefix,
                 // then reads the 64-bit address portion as the client ID.
                 if (!HasClientId) return null;
-                return BinaryPrimitives.ReadUInt64BigEndian(AddrSpan[ClientIdAddressPrefix.Length ..]);
+                return BinaryPrimitives.ReadUInt64BigEndian(AddrSpan[ClientIdAddressPrefix.Length..]);
             }
         }
 
@@ -113,7 +93,7 @@ namespace Tashi.ConsensusEngine
         private Span<byte> AddrSpan => AddressFamily switch
         {
             AddressFamily.InterNetwork => new Span<byte>(_data, 2, 4),
-            // sockaddr_in6 actually has the `flowinfo` field before the address, which is 4 bytes. 
+            // sockaddr_in6 actually has the `flowinfo` field before the address, which is 4 bytes.
             // For our intents and purposes that is always zero.
             AddressFamily.InterNetworkV6 => new Span<byte>(_data, 6, 16),
             _ => throw new InvalidOperationException($"SockAddr.AddressFamily is not an IP subtype: {AddressFamily}")
@@ -147,7 +127,7 @@ namespace Tashi.ConsensusEngine
 
             Debug.Assert(successful);
 
-            var clientIdSpan = addrSpan[ClientIdAddressPrefix.Length ..];
+            var clientIdSpan = addrSpan[ClientIdAddressPrefix.Length..];
 
             BinaryPrimitives.WriteUInt64BigEndian(clientIdSpan, clientId);
 
@@ -168,8 +148,8 @@ namespace Tashi.ConsensusEngine
             // Meant to be random, but this lets us unambiguously identify generated addresses
             // when we support mixed networking topology.
             //
-            // It's unlikely for another organization to randomly choose this global ID 
-            // *and* want to use TNT in their network. 
+            // It's unlikely for another organization to randomly choose this global ID
+            // *and* want to use TNT in their network.
             (byte)'T',
             (byte)'a',
             (byte)'s',
