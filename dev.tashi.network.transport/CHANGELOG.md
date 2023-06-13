@@ -30,6 +30,14 @@ Some features are going to be removed as soon as we're able to, such as the
 Unity Relay integration. This is because it's unsuitable for our architecture,
 but it enables people to start using TNT immediately.
 
+### Current limitations and known issues
+
+* Unity’s Netcode for Game Objects expects there to be a single host. When the
+  host disconnects from a session a new host isn’t chosen in their place.
+* The CPU load for processing events is high.
+* The number of participants must be specified upfront.
+* Players can't join an existing session.
+
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 [0.1.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.1.0
