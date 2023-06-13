@@ -71,6 +71,7 @@ jobs:
         if: inputs.release-version != ''
         uses: ncipollo/release-action@v1
         with:
+          bodyFile: "package/CHANGELOG.md"
           draft: true
           artifactErrorsFailBuild: true
           artifacts: "*.tgz"
