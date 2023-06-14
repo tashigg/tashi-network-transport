@@ -195,7 +195,7 @@ namespace Tashi.ConsensusEngine
             }
         }
 
-        internal (SockAddr addr, byte[] packet)? GetExternalTransmit()
+        internal ExternalTransmit? GetExternalTransmit()
         {
             var result = tce_external_transmit_get(_platform, out var transmit);
 
@@ -208,29 +208,7 @@ namespace Tashi.ConsensusEngine
                 return null;
             }
 
-            result = tce_external_transmit_get_addr(transmit, out var sockAddr);
-
-            if (result != Result.Success)
-            {
-                Debug.Log($"error from tce_external_transmit_get_addr: {result}");
-                return null;
-            }
-
-            result = tce_external_transmit_get_packet(transmit, out var packetPtr, out var packetLen);
-
-            if (result != Result.Success)
-            {
-                Debug.Log($"error from tce_external_transmit_get_packet: {result}");
-                return null;
-            }
-
-            var packet = new byte[(int)packetLen];
-                
-            Marshal.Copy(packetPtr, packet, 0, (int) packetLen);
-
-            tce_external_transmit_destroy(transmit);
-
-            return (sockAddr, packet);
+            return new ExternalTransmit(transmit);
         }
 
         internal void ExternalReceive(SockAddr addr, DataStreamReader stream)
@@ -346,21 +324,7 @@ namespace Tashi.ConsensusEngine
             out IntPtr transmitOut
         );
         
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_addr", CallingConvention = CallingConvention.Cdecl)]
-        static extern Result tce_external_transmit_get_addr(
-            IntPtr transmit,
-            out SockAddr addr
-        );
-
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_packet", CallingConvention = CallingConvention.Cdecl)]
-        static extern Result tce_external_transmit_get_packet(
-            IntPtr transmit,
-            out IntPtr packetOut,
-            out UInt64 packetLenOut
-        );
-
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_destroy", CallingConvention = CallingConvention.Cdecl)]
-        static extern Result tce_external_transmit_destroy(IntPtr transmit);
+        // other tce_external_transmit bindings are in `ExternalConnectionManager.cs`
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_recv_prepare(

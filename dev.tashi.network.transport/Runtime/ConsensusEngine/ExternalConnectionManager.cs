@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Unity.Jobs;
 using Unity.Networking.Transport;
@@ -79,34 +80,31 @@ namespace Tashi.ConsensusEngine
 
             while (true)
             {
-                var maybeTransmit = _platform.GetExternalTransmit();
+                // This will automatically call `.Dispose()` when leaving the scope.
+                using var transmit = _platform.GetExternalTransmit();
 
-                if (maybeTransmit == null)
+                if (transmit == null)
                 {
                     break;
                 }
-
-                // The docs on nullability suggest that this should happen automatically if we add an explicit check
-                // against null, but it doesn't.
-                var transmit = maybeTransmit.Value;
 
                 ExternalConnection conn;
 
                 try
                 {
-                    conn = _externalConnections[transmit.addr];
+                    conn = _externalConnections[transmit.Addr];
                 }
                 catch (KeyNotFoundException)
                 {
-                    if (!_pendingConnections.Contains(transmit.addr))
+                    if (!_pendingConnections.Contains(transmit.Addr))
                     {
-                        Debug.Log($"Attempting to transmit on unknown connection {transmit.addr}");
+                        Debug.Log($"Attempting to transmit on unknown connection {transmit.Addr}");
                     }
 
                     continue;
                 }
-
-                conn.Send(transmit.packet);
+                
+                conn.Send(transmit);
             }
 
             _externalListener?.Update(_platform);
@@ -166,7 +164,7 @@ namespace Tashi.ConsensusEngine
             return new ExternalConnection(localClientId, remoteClientId, networkDriver, networkConnection);
         }
 
-        internal void Send(byte[] packet)
+        internal void Send(ExternalTransmit transmit)
         {
             // Even though this is UDP we still have to get a `BIND` message through
             // to the Relay before this is considered "connected" and we can send data.
@@ -178,21 +176,15 @@ namespace Tashi.ConsensusEngine
             // a backoff loop until they start going through.
             if (State != NetworkConnection.State.Connected) return;
 
-            _networkDriver.BeginSend(_networkConnection, out var writer, packet.Length + 8);
+            _networkDriver.BeginSend(_networkConnection, out var writer, transmit.PacketLen + 8);
 
             try
             {
                 writer.WriteULong((ulong)IPAddress.HostToNetworkOrder((long)_localClientId));
-
-                // writer.AsNativeArray() uses the writer's entire buffer,
-                // without the internal offset.
-                // TODO: We should avoid the additional copies on the C# side eventually.
+                
                 unsafe
                 {
-                    fixed (byte* data = packet)
-                    {
-                        writer.WriteBytes(data, packet.Length);
-                    }
+                    writer.WriteBytes((byte*)transmit.Packet, transmit.PacketLen);
                 }
 
                 _networkDriver.EndSend(writer);
@@ -204,7 +196,7 @@ namespace Tashi.ConsensusEngine
                 return;
             }
 
-            Debug.Log($"sent {packet.Length} bytes to {_remoteClientId}");
+            Debug.Log($"sent {transmit.PacketLen} bytes to {_remoteClientId}");
         }
 
         internal void Update(Platform platform)
@@ -334,5 +326,85 @@ namespace Tashi.ConsensusEngine
         {
             _networkDriver.Dispose();
         }
+    }
+
+    internal class ExternalTransmit: IDisposable
+    {
+        private IntPtr _ptr;
+
+        internal readonly SockAddr Addr;
+
+        internal readonly IntPtr Packet;
+        internal readonly int PacketLen;
+
+        internal ExternalTransmit(IntPtr ptr)
+        {
+            _ptr = ptr;
+
+            try
+            {
+                var result = tce_external_transmit_get_addr(ptr, out var addr);
+
+                if (result != Result.Success)
+                {
+                    throw new Exception($"error from tce_external_transmit_get_addr: {result}");
+                }
+
+                Addr = addr;
+
+                result = tce_external_transmit_get_packet(ptr, out var packet, out var packetLen);
+                
+                if (result != Result.Success)
+                {
+                    throw new Exception($"error from tce_external_transmit_get_packet: {result}");
+                }
+
+                Packet = packet;
+
+                checked
+                {
+                    PacketLen = (int) packetLen;
+                }
+            }
+            catch (Exception e)
+            {
+                tce_external_transmit_destroy(ptr);
+                // This is apparently the syntax for re-throwing?
+                throw;
+            }
+        }
+        
+        
+
+        public void Dispose()
+        {
+            if (_ptr != IntPtr.Zero)
+            {
+
+                var result = tce_external_transmit_destroy(_ptr);
+                if (result != Result.Success)
+                {
+                    throw new Exception($"error from tce_external_transmit_destroy: {result}");
+                }
+                
+                _ptr = IntPtr.Zero;
+            }
+        }
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_addr", CallingConvention = CallingConvention.Cdecl)]
+        static extern Result tce_external_transmit_get_addr(
+            IntPtr transmit,
+            out SockAddr addr
+        );
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_packet", CallingConvention = CallingConvention.Cdecl)]
+        static extern Result tce_external_transmit_get_packet(
+            IntPtr transmit,
+            out IntPtr packetOut,
+            out UInt64 packetLenOut
+        );
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_destroy", CallingConvention = CallingConvention.Cdecl)]
+        static extern Result tce_external_transmit_destroy(IntPtr transmit);
     }
 }
