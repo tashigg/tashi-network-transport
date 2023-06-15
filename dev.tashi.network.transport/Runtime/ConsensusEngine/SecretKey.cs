@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.Runtime.InteropServices;
 
@@ -12,6 +14,8 @@ namespace Tashi.ConsensusEngine
         public const uint DerLength = 121;
 
         public byte[] Der { get; }
+
+        private PublicKey? _publicKey;
 
         private SecretKey(byte[] der)
         {
@@ -35,7 +39,7 @@ namespace Tashi.ConsensusEngine
             var result = tce_secret_key_generate(der, (UInt32)der.Length, ref actualLen);
             if (result != Result.Success || actualLen != der.Length)
             {
-                throw new Exception("Failed to generate a secret key");
+                throw new Exception($"Failed to generate a secret key: {result}");
             }
 
             return new SecretKey(der);
@@ -46,35 +50,43 @@ namespace Tashi.ConsensusEngine
             return Der;
         }
 
-        public PublicKey GetPublicKey()
+        public PublicKey PublicKey
         {
-            var der = new byte[PublicKey.DerLength];
-            UInt32 actualLen = 0;
-
-            var result = tce_public_key_get(
-                Der,
-                (uint)Der.Length,
-                der,
-                (UInt32)der.Length,
-                ref actualLen
-            );
-
-            if (result != Result.Success || actualLen != der.Length)
+            get
             {
-                throw new Exception("Failed to get the public key from the secret key");
-            }
+                if (_publicKey == null)
+                {
+                    var der = new byte[PublicKey.DerLength];
+                    UInt32 actualLen = 0;
 
-            return new PublicKey(der);
+                    var result = tce_public_key_get(
+                        Der,
+                        (uint)Der.Length,
+                        der,
+                        (UInt32)der.Length,
+                        ref actualLen
+                    );
+
+                    if (result != Result.Success || actualLen != der.Length)
+                    {
+                        throw new Exception($"Failed to get the public key from the secret key: {result}");
+                    }
+
+                    _publicKey = new PublicKey(der);
+                }
+
+                return _publicKey;
+            }
         }
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_secret_key_generate")]
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_secret_key_generate", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_secret_key_generate(
             [MarshalAs(UnmanagedType.LPArray)] byte[] secretKeyDer,
             UInt32 secretKeyDerCapacity,
             ref UInt32 secretKeyDerLen
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_public_key_get")]
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_public_key_get", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_public_key_get(
             byte[] secretKeyDer,
             UInt32 secretKeyDerLen,

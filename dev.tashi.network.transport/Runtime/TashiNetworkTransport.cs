@@ -1,10 +1,12 @@
 #nullable enable
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 using Unity.Netcode;
 using UnityEngine;
 using Tashi.ConsensusEngine;
@@ -20,12 +22,12 @@ namespace Tashi.NetworkTransport
 
         public delegate void OnPlatformInitHandler(object sender);
 
+        public bool SessionHasStarted { get; private set; }
         public event OnPlatformInitHandler? OnPlatformInit;
 
         private Platform? _platform;
         private SecretKey _secretKey;
         private List<AddressBookEntry> _addressBook = new();
-        private bool _platformStarted;
         private bool _isServer;
         private PublicKey? _hostPublicKey;
 
@@ -35,11 +37,15 @@ namespace Tashi.NetworkTransport
 
         private List<PublicKey> _connectedPeers = new();
 
+        private ExternalConnectionManager? _externalConnectionManager;
+
+        private static readonly NetworkMode NetworkMode = NetworkMode.External;
+
         TashiNetworkTransport()
         {
             _secretKey = SecretKey.Generate();
-            PublicKey publicKey = _secretKey.GetPublicKey();
-            _clientId = GetClientIdFromPublicKey(publicKey);
+            PublicKey publicKey = _secretKey.PublicKey;
+            _clientId = publicKey.ClientId;
         }
 
         // Network transport events must be in terms of seconds since the game
@@ -72,11 +78,6 @@ namespace Tashi.NetworkTransport
             Debug.Log($"Sending a {copied.Length} byte message to {clientId}");
         }
 
-        private ulong GetClientIdFromPublicKey(PublicKey pk)
-        {
-            return BitConverter.ToUInt64(pk.Der, pk.Der.Length - 8);
-        }
-
         // Returns true if an event was received.
         private bool ProcessEvent()
         {
@@ -103,7 +104,7 @@ namespace Tashi.NetworkTransport
                 return false;
             }
 
-            var creatorId = GetClientIdFromPublicKey(dataEvent.CreatorPublicKey);
+            var creatorId =dataEvent.CreatorPublicKey.ClientId;
             if (creatorId == _clientId)
             {
                 Debug.Log("Ignoring a message that was created by me");
@@ -194,16 +195,23 @@ namespace Tashi.NetworkTransport
             payload = default;
             receiveTime = Time.realtimeSinceStartup;
 
-            if (!_platformStarted)
+            if (!SessionHasStarted)
             {
                 return NetworkEvent.Nothing;
             }
+            
+            _externalConnectionManager?.Update();
 
             while (ProcessEvent())
             {
             }
-
+            
             return NetworkEvent.Nothing;
+        }
+
+        public void Update()
+        {
+            _externalConnectionManager?.Update();
         }
 
         public override bool StartClient()
@@ -228,21 +236,62 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
+            IPEndPoint bindEndPoint = NetworkMode == NetworkMode.External
+                ? _secretKey.PublicKey.SyntheticEndpoint
+                : new IPEndPoint(IPAddress.Any, Config.BindPort);
+
             _platform = new Platform(
-                NetworkMode.Local,
-                Config.BindPort,
+                NetworkMode,
+                bindEndPoint,
                 TimeSpan.FromMilliseconds(Config.SyncInterval),
                 _secretKey
             );
 
-            // TODO: Also handle ExternalAddressBookEntry. It will be serialized
-            // and sent to the lobby k/v store when `OnPlatformInit?.Invoke(this)` is called
-            var direct = new DirectAddressBookEntry(_platform.GetBoundAddress(), _secretKey.GetPublicKey());
-            AddressBookEntry = direct;
-            Debug.Log($"Listening on {direct.Address}");
+            if (NetworkMode == NetworkMode.External)
+            {
+                Debug.Log("binding in external mode");
+                
+                var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, Config.TotalNodes, _secretKey.PublicKey.ClientId);
+                
+                // C#'s task system is markedly different from Rust's: in Rust, the consumer of a `Future`
+                // is responsible for driving it forward unless explicitly spawned into a runtime,
+                // whereas C# is closer to Javascript's Promise system where tasks dependent on the completion of a
+                // Promise just need to be attached to it to be automatically started when it completes.
+                //
+                // This makes sense if you consider that in C#, like Javascript, there is no overarching concept
+                // of ownership and multiple dependent tasks can consume the result of a single antecedent task.
+                //
+                // And in fact, like Javascript, the task returned by this method is automatically started ("hot"):
+                // https://stackoverflow.com/a/43089445
+                //
+                // Only explicitly created tasks are not started (or "cold").
+                var bindTask = externalManager.BindAsync();
 
-            AddAddressBookEntry(AddressBookEntry, _isServer);
+                bindTask.ContinueWith(_ =>
+                    {
+                        if (bindTask.IsCompletedSuccessfully)
+                        {
+                            InitFinished(new ExternalAddressBookEntry(bindTask.Result, _secretKey.PublicKey));
+                        }
+                        else
+                        {
+                            Debug.LogWarning("exception from ExternalConnectionManager.BindAsync()");
+                            Debug.LogException(bindTask.Exception);
+                        }
+                    },
+                    // Ensure we use the Unity task scheduler and not the default, global one.
+                    TaskScheduler.FromCurrentSynchronizationContext());
+            }
+            else
+            {
+                InitFinished(new DirectAddressBookEntry(_platform.GetBoundAddress(), _secretKey.PublicKey));
+            }
+        }
 
+        private void InitFinished(AddressBookEntry addressBookEntry)
+        {
+            AddressBookEntry = addressBookEntry;
+            AddAddressBookEntry(addressBookEntry, _isServer);
             OnPlatformInit?.Invoke(this);
         }
 
@@ -267,7 +316,9 @@ namespace Tashi.NetworkTransport
         public override void Shutdown()
         {
             Debug.Log("TNT Shutdown");
-            _platform = null;
+            _platform?.Dispose();
+            SessionHasStarted = false;
+            _externalConnectionManager?.Dispose();
         }
 
         public override void Initialize(NetworkManager? networkManager = null)
@@ -296,8 +347,30 @@ namespace Tashi.NetworkTransport
             }
             else if (entry is ExternalAddressBookEntry external)
             {
-                Debug.Log($"Added node {external.RelayJoinCode}");
-                // TODO: Add it to the external connection manager
+                if (_externalConnectionManager == null)
+                {
+                    Debug.Log($"Received external address book entry in non-external mode: {external}");
+                    return;
+                }
+
+                Debug.Log($"Added node {external.PublicKey.SyntheticSockAddr} with join code {external.RelayJoinCode}");
+
+#pragma warning disable CS4014
+                if (!entry.PublicKey.Equals(_secretKey.PublicKey))
+                {
+                    // Only attempt to connect to another peer.
+                    _externalConnectionManager.ConnectAsync(external.PublicKey.ClientId, external.RelayJoinCode)
+                        .ContinueWith(task =>
+                        {
+                            if (task.IsFaulted)
+                            {
+                                Debug.LogWarning($"failed to connect to {external.PublicKey.ClientId} with join code {external.RelayJoinCode}");
+                                Debug.LogException(task.Exception);
+                            }
+                        },
+                            TaskScheduler.FromCurrentSynchronizationContext());
+                }
+#pragma warning restore CS4014
             }
             else
             {
@@ -318,7 +391,7 @@ namespace Tashi.NetworkTransport
 
             Debug.Log($"Discovered {_addressBook.Count} of {Config.TotalNodes}");
 
-            if (_addressBook.Count == Config.TotalNodes && !_platformStarted)
+            if (_addressBook.Count == Config.TotalNodes && !SessionHasStarted)
             {
                 StartSyncing();
             }
@@ -336,7 +409,7 @@ namespace Tashi.NetworkTransport
             try
             {
                 _platform.Start(_addressBook);
-                _platformStarted = true;
+                SessionHasStarted = true;
 
                 // TAS-76
                 _platform.Send(Encoding.ASCII.GetBytes("Hi"));

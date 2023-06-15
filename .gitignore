@@ -3,4 +3,5 @@
 *.dylib
 *.sln
 *.so
+*.dll.meta
 *.blob

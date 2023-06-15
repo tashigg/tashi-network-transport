@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2] - Unreleased
+## [0.2.0] - Unreleased
 
 ### Added
 
@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   included in the distributed package.
 * An example project which uses the sample script is included in the TNT git
   repo.
+* `TashiNetworkTransport` now has a `SessionHasStarted` property.
+* Unity Relay is now supported, which enables communication over WAN. This is
+  intended to be a temporary measure until Tashi Relay is released.
+
+### Changed
+
+* `SecretKey.GetPublicKey()` has become a property named `PublicKey`.
 
 ## [0.1.0]
 
@@ -23,6 +30,14 @@ Some features are going to be removed as soon as we're able to, such as the
 Unity Relay integration. This is because it's unsuitable for our architecture,
 but it enables people to start using TNT immediately.
 
+### Current limitations and known issues
+
+* Unity’s Netcode for Game Objects expects there to be a single host. When the
+  host disconnects from a session a new host isn’t chosen in their place.
+* The CPU load for processing events is high.
+* The number of participants must be specified upfront.
+* Players can't join an existing session.
+
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
-[0.0.1]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.0.1
+[0.1.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.1.0
