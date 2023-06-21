@@ -191,7 +191,6 @@ namespace Tashi.ConsensusEngine
             }
             catch (Exception e)
             {
-                Debug.Log("exception in ExternalConnection.Send()");
                 Debug.LogException(e);
                 return;
             }
