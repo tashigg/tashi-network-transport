@@ -405,6 +405,9 @@ namespace Tashi.NetworkTransport
             }
 
             Debug.Log($"StartSyncing for client ID {_clientId}");
+            
+            // TODO: if `relayApiKey` is set, call `Platform.CreateRelaySession()` and wait for that to finish
+            // and propagate the relay server info out to the application before calling `Platform.Start()`.
 
             try
             {

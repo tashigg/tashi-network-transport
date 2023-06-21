@@ -4,6 +4,7 @@ using System;
 using System.Buffers.Binary;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -34,6 +35,19 @@ namespace Tashi.ConsensusEngine
             }
 
             Der = der;
+        }
+
+        internal static PublicKey FromPtr(IntPtr der, UIntPtr derLen)
+        {
+            if (derLen != new UIntPtr(DerLength))
+            {
+                throw new ArgumentException($"DER encoded public key must be {DerLength} bytes");
+            }
+
+            byte[] derOut = new byte[DerLength];
+            Marshal.Copy(der, derOut, 0, (int) DerLength);
+
+            return new PublicKey(derOut);
         }
 
         public bool Equals(PublicKey? other)

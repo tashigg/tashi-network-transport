@@ -1,5 +1,7 @@
 ﻿#nullable enable
 
+using System;
+
 namespace Tashi.ConsensusEngine
 {
     enum Result
@@ -33,5 +35,23 @@ namespace Tashi.ConsensusEngine
         InvalidSockAddr,
         BindAddressRequired,
         LoggingAlreadySet,
+    }
+
+    static class ResultExtensions
+    {
+        public static void SuccessOrThrow(this Result result, string operationName)
+        {
+            if (result != Result.Success)
+            {
+                throw new ResultException(result, operationName);
+            }
+        }
+    }
+
+    sealed class ResultException : Exception
+    {
+        internal ResultException(Result result, string operationName) : base($"error from {operationName}: {result}")
+        {
+        }
     }
 }
