@@ -251,7 +251,7 @@ namespace Tashi.ConsensusEngine
                 stream.ReadBytes((byte*)buf, readLen);
             }
 
-            result = tce_external_recv_commit(_platform, (UInt64)readLen, ref addr, addr.Len);
+            result = tce_external_recv_commit(_platform, (UInt64)readLen, ref addr, (UInt32)addr.Len);
 
             if (result != Result.Success)
             {
@@ -324,7 +324,7 @@ namespace Tashi.ConsensusEngine
             {
                 tce_relay_create_session(_platform, relayApiKey, _sessionResultDelegate);
             }
-            catch (Exception _e)
+            catch (Exception)
             {
                 _sessionResultDelegate = null;
                 throw;
