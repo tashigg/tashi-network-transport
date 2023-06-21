@@ -366,10 +366,9 @@ namespace Tashi.ConsensusEngine
                     PacketLen = (int) packetLen;
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 tce_external_transmit_destroy(ptr);
-                // This is apparently the syntax for re-throwing?
                 throw;
             }
         }
