@@ -121,7 +121,7 @@ public class LocalWithLobby : MonoBehaviour
             statusText.text = "";
         }
 
-        statusText.text += $"\n{_clientCount} / {NetworkTransport.Config.TotalNodes - 1} peer connections";
+        statusText.text += $"\n{_clientCount} peer connections";
     }
 
     private async void Update()
@@ -148,7 +148,13 @@ public class LocalWithLobby : MonoBehaviour
             }
 
             var lobby = await LobbyService.Instance.GetLobbyAsync(_lobbyId);
-            NetworkTransport.ApplyIncomingSessionDetails(IncomingSessionDetails.FromUnityLobby(lobby));
+            var incomingSessionDetails = IncomingSessionDetails.FromUnityLobby(lobby);
+
+            // This should be replaced with whatever logic you use to determine when a lobby is locked in.
+            if (incomingSessionDetails.AddressBook.Count == 2)
+            {
+                NetworkTransport.UpdateSessionDetails(incomingSessionDetails);
+            }
         }
     }
 }

@@ -56,7 +56,7 @@ namespace Tashi.NetworkTransport
 
     public class OutgoingSessionDetails
     {
-        public DirectAddressBookEntry? Relay;
+        public DirectAddressBookEntry? TashiRelay;
         public AddressBookEntry? AddressBookEntry;
 
         public void AddTo(UpdatePlayerOptions playerOptions)
@@ -78,7 +78,7 @@ namespace Tashi.NetworkTransport
 
         public void AddTo(UpdateLobbyOptions lobbyOptions)
         {
-            if (Relay is null)
+            if (TashiRelay is null)
             {
                 return;
             }
@@ -87,7 +87,7 @@ namespace Tashi.NetworkTransport
 
             lobbyOptions.Data.Add(
                 "TashiRelay",
-                new DataObject(DataObject.VisibilityOptions.Member, Relay.Serialize())
+                new DataObject(DataObject.VisibilityOptions.Member, TashiRelay.Serialize())
             );
         }
     }
