@@ -75,6 +75,17 @@ namespace Tashi.ConsensusEngine
         {
         }
 
+        public new static DirectAddressBookEntry? Deserialize(string? data)
+        {
+            var entry = AddressBookEntry.Deserialize(data);
+            if (entry is DirectAddressBookEntry direct)
+            {
+                return direct;
+            }
+
+            return null;
+        }
+
         public override bool Equals(AddressBookEntry other)
         {
             if (other is not DirectAddressBookEntry direct)

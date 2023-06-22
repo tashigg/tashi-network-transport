@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -10,20 +9,22 @@ using System.Threading.Tasks;
 using Unity.Netcode;
 using UnityEngine;
 using Tashi.ConsensusEngine;
-using UnityEngine.Serialization;
+using UnityEngine.Assertions;
 
 namespace Tashi.NetworkTransport
 {
     [AddComponentMenu("Netcode/Tashi Network Transport")]
     public class TashiNetworkTransport : Unity.Netcode.NetworkTransport
     {
-        public TashiNetworkTransportEditorConfig Config = new();
-        public AddressBookEntry? AddressBookEntry;
+        public override ulong ServerClientId { get; }
 
-        public delegate void OnPlatformInitHandler(object sender);
+        public TashiNetworkTransportEditorConfig Config = new();
 
         public bool SessionHasStarted { get; private set; }
-        public event OnPlatformInitHandler? OnPlatformInit;
+        public OutgoingSessionDetails OutgoingSessionDetails { get; private set; }
+
+        public delegate void OnPlatformInitHandler(object sender);
+        public  OnPlatformInitHandler? OnPlatformInit;
 
         private Platform? _platform;
         private SecretKey _secretKey;
@@ -43,6 +44,7 @@ namespace Tashi.NetworkTransport
 
         TashiNetworkTransport()
         {
+            OutgoingSessionDetails = new OutgoingSessionDetails();
             _secretKey = SecretKey.Generate();
             PublicKey publicKey = _secretKey.PublicKey;
             _clientId = publicKey.ClientId;
@@ -290,7 +292,7 @@ namespace Tashi.NetworkTransport
 
         private void InitFinished(AddressBookEntry addressBookEntry)
         {
-            AddressBookEntry = addressBookEntry;
+            OutgoingSessionDetails.AddressBookEntry = addressBookEntry;
             AddAddressBookEntry(addressBookEntry, _isServer);
             OnPlatformInit?.Invoke(this);
         }
@@ -326,9 +328,15 @@ namespace Tashi.NetworkTransport
             Debug.Log("TNT Initialize");
         }
 
-        public override ulong ServerClientId { get; }
+        public void ApplyIncomingSessionDetails(IncomingSessionDetails sessionDetails)
+        {
+            foreach (var entry in sessionDetails.AddressBook)
+            {
+                AddAddressBookEntry(entry, entry == sessionDetails.Host);
+            }
+        }
 
-        public void AddAddressBookEntry(AddressBookEntry entry, bool treatAsHost)
+        private void AddAddressBookEntry(AddressBookEntry entry, bool treatAsHost)
         {
             if (_addressBook.Contains(entry))
             {
@@ -393,32 +401,58 @@ namespace Tashi.NetworkTransport
 
             if (_addressBook.Count == Config.TotalNodes && !SessionHasStarted)
             {
-                StartSyncing();
+                BeginSessionSetup();
             }
         }
 
-        private void StartSyncing()
+        private void BeginSessionSetup()
         {
-            if (_platform == null)
+            Assert.IsNotNull(_platform);
+            Assert.IsFalse(SessionHasStarted);
+
+            SessionHasStarted = true;
+
+            if (!string.IsNullOrWhiteSpace(Config.RelayApiKey))
             {
-                throw new InvalidOperationException("_platform is null");
+                if (_isServer)
+                {
+                    _platform?.CreateRelaySession(
+                        Config.RelayApiKey,
+                        entry =>
+                        {
+                            OutgoingSessionDetails.Relay = entry;
+                            CompleteSessionSetup();
+                        },
+                        e =>
+                        {
+                            Debug.LogException(e);
+                            SessionHasStarted = false;
+                        }
+                    );
+                }
+                else
+                {
+                    // TODO: _platform?.JoinRelaySession()
+                }
+
+                return;
             }
 
-            Debug.Log($"StartSyncing for client ID {_clientId}");
-            
-            // TODO: if `relayApiKey` is set, call `Platform.CreateRelaySession()` and wait for that to finish
-            // and propagate the relay server info out to the application before calling `Platform.Start()`.
+            CompleteSessionSetup();
+        }
 
+        private void CompleteSessionSetup()
+        {
             try
             {
-                _platform.Start(_addressBook);
-                SessionHasStarted = true;
+                _platform?.Start(_addressBook);
 
                 // TAS-76
-                _platform.Send(Encoding.ASCII.GetBytes("Hi"));
+                _platform?.Send(Encoding.ASCII.GetBytes("Hi"));
             }
             catch (Exception e)
             {
+                SessionHasStarted = false;
                 Debug.LogException(e);
             }
         }
