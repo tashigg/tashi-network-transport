@@ -1,17 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Tashi.ConsensusEngine;
 using Tashi.NetworkTransport;
 using TMPro;
 using Unity.Netcode;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
 using Unity.Services.Lobbies;
-using Unity.Services.Lobbies.Models;
 using UnityEngine;
 
-public class LocalWithLobby : MonoBehaviour
+public class UsingUnityLobby : MonoBehaviour
 {
     public TMP_InputField profileName;
     public Canvas profileMenu;
@@ -92,22 +89,6 @@ public class LocalWithLobby : MonoBehaviour
         _lobbyId = lobby.Id;
     }
 
-    private Dictionary<string, PlayerDataObject> GetPlayerData()
-    {
-        if (NetworkTransport.AddressBookEntry is null)
-        {
-            return new();
-        }
-
-        return new()
-        {
-            {
-                "AddressBookEntry",
-                new PlayerDataObject(PlayerDataObject.VisibilityOptions.Member, NetworkTransport.AddressBookEntry.Serialize())
-            }
-        };
-    }
-
     private void Start()
     {
         Debug.Log("Start");
@@ -130,18 +111,6 @@ public class LocalWithLobby : MonoBehaviour
         }
     }
 
-    private async Task SendPlayerDataToLobby()
-    {
-        var options = new UpdatePlayerOptions
-        {
-            Data = GetPlayerData(),
-        };
-
-        Debug.Log($"Sending AddressBookEntry = {NetworkTransport.AddressBookEntry?.Serialize()}");
-
-        await LobbyService.Instance.UpdatePlayerAsync(_lobbyId, PlayerId, options);
-    }
-
     void UpdateStatusText()
     {
         if (!string.IsNullOrEmpty(PlayerId))
@@ -154,35 +123,6 @@ public class LocalWithLobby : MonoBehaviour
         }
 
         statusText.text += $"\n{_clientCount} / {NetworkTransport.Config.TotalNodes - 1} peer connections";
-    }
-
-    private async Task ApplyPlayerDataFromLobby()
-    {
-        var lobby = await LobbyService.Instance.GetLobbyAsync(_lobbyId);
-
-        foreach (var player in lobby.Players)
-        {
-            if (player.Id == PlayerId || player.Data == null)
-            {
-                continue;
-            }
-
-            if (!player.Data.TryGetValue("AddressBookEntry", out var addressBookEntryData))
-            {
-                Debug.LogError($"Player {player.Id} didn't provide an AddressBookEntry");
-                continue;
-            }
-
-            Debug.Log($"Received AddressBookEntry = {addressBookEntryData.Value}");
-
-            var entry = AddressBookEntry.Deserialize(addressBookEntryData.Value);
-            if (entry == null)
-            {
-                continue;
-            }
-
-            NetworkTransport.AddAddressBookEntry(entry, player.Id == lobby.HostId);
-        }
     }
 
     private async void Update()
@@ -198,8 +138,12 @@ public class LocalWithLobby : MonoBehaviour
                 await LobbyService.Instance.SendHeartbeatPingAsync(_lobbyId);
             }
 
-            await SendPlayerDataToLobby();
-            await ApplyPlayerDataFromLobby();
+            var lobby = await LobbyService.Instance.GetLobbyAsync(_lobbyId);
+            NetworkTransport.SessionSetupDetails?.Update(lobby);
+
+            var options = new UpdatePlayerOptions();
+            NetworkTransport.SessionSetupDetails?.ModifyPlayerDataForUpdate(options.Data);
+            await LobbyService.Instance.UpdatePlayerAsync(_lobbyId, PlayerId, options);
         }
     }
 }
