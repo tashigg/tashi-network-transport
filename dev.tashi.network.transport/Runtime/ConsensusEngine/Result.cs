@@ -35,6 +35,11 @@ namespace Tashi.ConsensusEngine
         InvalidSockAddr,
         BindAddressRequired,
         LoggingAlreadySet,
+        RelaySessionError,
+        RelaySessionInitIncomplete,
+        RelaySessionRateLimited,
+        RelaySessionUserLimitExceeded,
+        RelaySessionIntervalOutOfRange,
     }
 
     static class ResultExtensions
