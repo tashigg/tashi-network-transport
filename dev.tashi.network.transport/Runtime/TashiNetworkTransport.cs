@@ -41,8 +41,6 @@ namespace Tashi.NetworkTransport
 
         private ExternalConnectionManager? _externalConnectionManager;
 
-        private static readonly NetworkMode NetworkMode = NetworkMode.External;
-
         TashiNetworkTransport()
         {
             OutgoingSessionDetails = new OutgoingSessionDetails();
@@ -246,18 +244,18 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
-            IPEndPoint bindEndPoint = NetworkMode == NetworkMode.External
+            var bindEndPoint = Config.NetworkMode == NetworkMode.UnityRelay
                 ? _secretKey.PublicKey.SyntheticEndpoint
                 : new IPEndPoint(IPAddress.Any, Config.BindPort);
 
             _platform = new Platform(
-                NetworkMode,
+                Config.NetworkMode,
                 bindEndPoint,
                 TimeSpan.FromMilliseconds(Config.SyncInterval),
                 _secretKey
             );
 
-            if (NetworkMode == NetworkMode.External)
+            if (Config.NetworkMode == NetworkMode.UnityRelay)
             {
                 Debug.Log("binding in external mode");
                 
@@ -427,7 +425,7 @@ namespace Tashi.NetworkTransport
         {
             Assert.IsNotNull(_platform);
 
-            if (!string.IsNullOrWhiteSpace(Config.RelayApiKey))
+            if (!string.IsNullOrWhiteSpace(Config.TashiRelayApiKey))
             {
                 if (_state == State.WaitingForTashiRelay)
                 {
@@ -439,7 +437,7 @@ namespace Tashi.NetworkTransport
                 _state = State.WaitingForTashiRelay;
 
                 _platform?.CreateRelaySession(
-                    Config.RelayApiKey,
+                    Config.TashiRelayApiKey,
                     entry =>
                     {
                         Debug.Log($"The Tashi Relay has been allocated: {entry}");
@@ -464,7 +462,7 @@ namespace Tashi.NetworkTransport
         {
             Assert.IsNotNull(_platform);
 
-            if (!string.IsNullOrWhiteSpace(Config.RelayApiKey))
+            if (!string.IsNullOrWhiteSpace(Config.TashiRelayApiKey))
             {
                 if (tashiRelay is not null)
                 {

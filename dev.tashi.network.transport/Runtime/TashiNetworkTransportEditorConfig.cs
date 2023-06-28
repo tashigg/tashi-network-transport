@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using Tashi.ConsensusEngine;
 
 namespace Tashi.NetworkTransport
 {
@@ -12,7 +13,10 @@ namespace Tashi.NetworkTransport
         [Tooltip("How often syncs should be sent to other nodes.")]
         public uint SyncInterval = 33;
 
+        [Tooltip("Which network mode to run TNT in")]
+        public NetworkMode NetworkMode = NetworkMode.TashiRelay;
+
         [Tooltip("If using Tashi Relay, supply the API key you were given here.")]
-        public string RelayApiKey = "";
+        public string TashiRelayApiKey = "";
     }
 }

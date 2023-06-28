@@ -15,7 +15,8 @@ namespace Tashi.ConsensusEngine
     {
         Loopback,
         Local,
-        External
+        UnityRelay,
+        TashiRelay,
     }
 
     /// <summary>
