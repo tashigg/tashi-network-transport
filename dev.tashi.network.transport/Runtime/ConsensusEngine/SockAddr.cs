@@ -145,13 +145,14 @@ namespace Tashi.ConsensusEngine
             }
 
             var sockAddrOut = new SockAddr();
+            sockAddrOut._data = new byte[126];
 
             // This is one place we actually do want to use native endianness, as that's how it's specified.
             sockAddrOut._addressFamily = (ushort)Marshal.ReadInt16(sockAddr);
             
             // Offset to the actual data.
             var sockAddrData = sockAddr + 2;
-            
+
             Marshal.Copy(sockAddrData, sockAddrOut._data, 0, (int) sockAddrLen - 2);
 
             return sockAddrOut;

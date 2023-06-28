@@ -447,7 +447,7 @@ namespace Tashi.ConsensusEngine
             CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_relay_create_session(
             IntPtr platform,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string apiKey,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string? apiKey,
             OnSessionResult onSessionResult
         );
 
