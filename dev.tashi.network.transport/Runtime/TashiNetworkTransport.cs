@@ -440,7 +440,7 @@ namespace Tashi.NetworkTransport
                     Config.TashiRelayApiKey,
                     entry =>
                     {
-                        Debug.Log($"The Tashi Relay has been allocated: {entry}");
+                        Debug.Log($"The Tashi Relay has been allocated: {entry.Address}:{entry.Port}");
                         OutgoingSessionDetails.TashiRelay = entry;
                         CompleteSessionSetup();
                     },
