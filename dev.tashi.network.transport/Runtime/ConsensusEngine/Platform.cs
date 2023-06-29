@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
-using Unity.Collections;
+using System.Threading;
 using Unity.Networking.Transport;
 using UnityEngine;
 
@@ -31,7 +31,7 @@ namespace Tashi.ConsensusEngine
         private ulong _clientId;
 
         // Unity Relay enforces a limit of 1400 bytes per each datagram.
-        private static UInt64 MaxRelayDataLen = 1400;
+        private static readonly UInt64 MaxRelayDataLen = 1400;
 
         static Platform()
         {
@@ -292,6 +292,8 @@ namespace Tashi.ConsensusEngine
                 throw new InvalidOperationException("Platform already started");
             }
 
+            var syncContext = SynchronizationContext.Current;
+
             // We need to retain this instance until the call completes or the platform instance is destroyed
             // so it doesn't get garbage collected while the async call is still running.
             //
@@ -308,11 +310,11 @@ namespace Tashi.ConsensusEngine
 
                         var entry = new DirectAddressBookEntry(sockAddr.IPEndPoint, publicKey);
 
-                        onRelayAddressBookEntry(entry);
+                        syncContext.Post(_ => onRelayAddressBookEntry(entry), null);
                     }
                     catch (Exception e)
                     {
-                        onError(e);
+                        syncContext.Post(_ => onError(e), null);
                     }
                     finally
                     {

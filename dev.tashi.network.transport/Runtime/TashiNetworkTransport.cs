@@ -433,14 +433,15 @@ namespace Tashi.NetworkTransport
                     return;
                 }
 
-                Debug.Log("Requesting a Tashi Relay allocation");
+                Debug.Log($"Requesting a Tashi Relay allocation");
                 _state = State.WaitingForTashiRelay;
 
                 _platform?.CreateRelaySession(
                     Config.TashiRelayApiKey,
                     entry =>
                     {
-                        Debug.Log($"The Tashi Relay has been allocated: {entry.Address}:{entry.Port}");
+                        Debug.Log(
+                            $"The Tashi Relay has been allocated: {entry.Address}:{entry.Port}");
                         OutgoingSessionDetails.TashiRelay = entry;
                         CompleteSessionSetup();
                     },
