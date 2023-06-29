@@ -59,36 +59,66 @@ namespace Tashi.NetworkTransport
         public DirectAddressBookEntry? TashiRelay;
         public AddressBookEntry? AddressBookEntry;
 
-        public void AddTo(UpdatePlayerOptions playerOptions)
+        private int _lastUpdatePlayerOptionsHash;
+        private int _lastUpdateLobbyOptionsHash;
+
+        /// <summary>
+        /// Adds the required data to <see cref="UpdatePlayerOptions"/>, which must be sent to the lobby.
+        /// </summary>
+        /// <param name="playerOptions"></param>
+        /// <returns>True if the data added has been updated since the last call.</returns>
+        public bool AddTo(UpdatePlayerOptions playerOptions)
         {
             if (AddressBookEntry is null)
             {
-                return;
+                return false;
             }
 
             playerOptions.Data ??= new();
 
-            playerOptions.Data.Add("AddressBookEntry",
-                new PlayerDataObject(
-                    PlayerDataObject.VisibilityOptions.Member,
-                    AddressBookEntry.Serialize()
-                )
-            );
+            var playerDataObject = new PlayerDataObject(
+                PlayerDataObject.VisibilityOptions.Member,
+                AddressBookEntry.Serialize());
+
+            var playerDataObjectHash = playerDataObject.GetHashCode();
+
+            playerOptions.Data.Add("AddressBookEntry", playerDataObject);
+
+            if (playerDataObjectHash != _lastUpdatePlayerOptionsHash)
+            {
+                _lastUpdatePlayerOptionsHash = playerDataObjectHash;
+                return true;
+            }
+
+            return false;
         }
 
-        public void AddTo(UpdateLobbyOptions lobbyOptions)
+        /// <summary>
+        /// Adds the required data to <see cref="UpdateLobbyOptions"/>, which must be sent to the lobby.
+        /// </summary>
+        /// <param name="lobbyOptions"></param>
+        /// <returns>True if the data added has been updated since the last call.</returns>
+        public bool AddTo(UpdateLobbyOptions lobbyOptions)
         {
             if (TashiRelay is null)
             {
-                return;
+                return false;
             }
 
             lobbyOptions.Data ??= new();
 
-            lobbyOptions.Data.Add(
-                "TashiRelay",
-                new DataObject(DataObject.VisibilityOptions.Member, TashiRelay.Serialize())
-            );
+            var dataObject = new DataObject(DataObject.VisibilityOptions.Member, TashiRelay.Serialize());
+            var dataObjectHash = dataObject.GetHashCode();
+
+            lobbyOptions.Data.Add("TashiRelay", dataObject);
+
+            if (dataObjectHash != _lastUpdateLobbyOptionsHash)
+            {
+                _lastUpdateLobbyOptionsHash = dataObjectHash;
+                return true;
+            }
+
+            return false;
         }
     }
 }
