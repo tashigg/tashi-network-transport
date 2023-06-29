@@ -436,6 +436,8 @@ namespace Tashi.NetworkTransport
                 Debug.Log($"Requesting a Tashi Relay allocation");
                 _state = State.WaitingForTashiRelay;
 
+                _platform?.SetAddressBook(_addressBook);
+
                 _platform?.CreateRelaySession(
                     Config.TashiRelayApiKey,
                     entry =>
@@ -468,6 +470,7 @@ namespace Tashi.NetworkTransport
                 if (tashiRelay is not null)
                 {
                     Debug.Log($"Tashi Relay is now available: {tashiRelay}");
+                    AddAddressBookEntry(tashiRelay, false);
                     CompleteSessionSetup();
                 }
                 else
