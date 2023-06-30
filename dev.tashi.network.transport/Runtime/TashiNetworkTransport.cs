@@ -244,18 +244,18 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
-            var bindEndPoint = Config.NetworkMode == NetworkMode.UnityRelay
+            var bindEndPoint = Config.NetworkMode == TashiNetworkMode.UnityRelay
                 ? _secretKey.PublicKey.SyntheticEndpoint
                 : new IPEndPoint(IPAddress.Any, Config.BindPort);
 
             _platform = new Platform(
-                Config.NetworkMode,
+                Config.NetworkMode.ToTceNetworkMode(),
                 bindEndPoint,
                 TimeSpan.FromMilliseconds(Config.SyncInterval),
                 _secretKey
             );
 
-            if (Config.NetworkMode == NetworkMode.UnityRelay)
+            if (Config.NetworkMode == TashiNetworkMode.UnityRelay)
             {
                 Debug.Log("binding in external mode");
                 

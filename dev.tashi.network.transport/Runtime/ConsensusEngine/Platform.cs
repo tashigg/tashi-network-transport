@@ -11,12 +11,12 @@ using UnityEngine;
 
 namespace Tashi.ConsensusEngine
 {
+    // NOTE: this should match `TceNetworkMode` in TCE or things will get weird.
     public enum NetworkMode
     {
         Loopback,
         Local,
-        UnityRelay,
-        TashiRelay,
+        External,
     }
 
     /// <summary>
@@ -40,7 +40,7 @@ namespace Tashi.ConsensusEngine
             {
                 NativeLogger.Init();
                 // The ordering of these two doesn't particularly matter.
-                NativeLogger.SetFilter("tashi_consensus_engine=info");
+                NativeLogger.SetFilter("tashi_consensus_engine=debug");
                 Debug.Log("logging initialized");
             }
             catch (Exception e)
@@ -325,7 +325,8 @@ namespace Tashi.ConsensusEngine
 
             try
             {
-                tce_relay_create_session(_platform, relayApiKey, _sessionResultDelegate);
+                tce_relay_create_session(_platform, relayApiKey, _sessionResultDelegate)
+                    .SuccessOrThrow("tce_relay_create_session");
             }
             catch (Exception)
             {

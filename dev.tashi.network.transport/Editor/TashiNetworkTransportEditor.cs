@@ -31,8 +31,8 @@ namespace Tashi.NetworkTransport
             serializedObject.Update();
             EditorGUILayout.PropertyField(m_SyncInterval, new GUIContent("Sync Interval (ms): "));
             EditorGUILayout.PropertyField(m_BindPort);
-            m_NetworkMode.enumValueIndex = (int)(NetworkMode)EditorGUILayout.EnumPopup((NetworkMode)m_NetworkMode.enumValueIndex);
-            if (m_NetworkMode.enumValueIndex == (int)NetworkMode.TashiRelay)
+            m_NetworkMode.enumValueIndex = (int)(TashiNetworkMode)EditorGUILayout.EnumPopup((TashiNetworkMode)m_NetworkMode.enumValueIndex);
+            if (m_NetworkMode.enumValueIndex == (int)TashiNetworkMode.TashiRelay)
             {
                 EditorGUILayout.PropertyField(m_TashiRelayApiKey);
             }

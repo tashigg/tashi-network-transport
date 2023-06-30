@@ -14,7 +14,7 @@ namespace Tashi.NetworkTransport
         public uint SyncInterval = 33;
 
         [Tooltip("Which network mode to run TNT in")]
-        public NetworkMode NetworkMode = NetworkMode.TashiRelay;
+        public TashiNetworkMode NetworkMode = TashiNetworkMode.TashiRelay;
 
         [Tooltip("If using Tashi Relay, supply the API key you were given here.")]
         public string TashiRelayApiKey = "";
