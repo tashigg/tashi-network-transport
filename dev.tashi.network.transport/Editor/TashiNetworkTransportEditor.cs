@@ -15,6 +15,7 @@ namespace Tashi.NetworkTransport
         private SerializedProperty m_BindPort;
         private SerializedProperty m_SyncInterval;
         private SerializedProperty m_NetworkMode;
+        private SerializedProperty m_TashiRelayBaseUrl;
         private SerializedProperty m_TashiRelayApiKey;
 
         void OnEnable()
@@ -23,6 +24,7 @@ namespace Tashi.NetworkTransport
             m_SyncInterval = m_Config.FindPropertyRelative("SyncInterval");
             m_BindPort = m_Config.FindPropertyRelative("BindPort");
             m_NetworkMode = m_Config.FindPropertyRelative("NetworkMode");
+            m_TashiRelayBaseUrl = m_Config.FindPropertyRelative("TashiRelayBaseUrl");
             m_TashiRelayApiKey = m_Config.FindPropertyRelative("TashiRelayApiKey");
         }
 
@@ -34,6 +36,7 @@ namespace Tashi.NetworkTransport
             m_NetworkMode.enumValueIndex = (int)(TashiNetworkMode)EditorGUILayout.EnumPopup((TashiNetworkMode)m_NetworkMode.enumValueIndex);
             if (m_NetworkMode.enumValueIndex == (int)TashiNetworkMode.TashiRelay)
             {
+                EditorGUILayout.PropertyField(m_TashiRelayBaseUrl);
                 EditorGUILayout.PropertyField(m_TashiRelayApiKey);
             }
 

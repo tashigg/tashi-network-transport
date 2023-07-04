@@ -278,12 +278,14 @@ namespace Tashi.ConsensusEngine
         ///
         /// On error, the second delegate will be invoked.
         /// </summary>
+        /// <param name="relayBaseUrl"></param>
         /// <param name="relayApiKey"></param>
         /// <param name="onRelayAddressBookEntry"></param>
         /// <param name="onError"></param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="InvalidOperationException"></exception>
-        public void CreateRelaySession(string relayApiKey, Action<DirectAddressBookEntry> onRelayAddressBookEntry,
+        public void CreateRelaySession(string relayBaseUrl, string relayApiKey,
+            Action<DirectAddressBookEntry> onRelayAddressBookEntry,
             Action<Exception> onError)
         {
             if (relayApiKey.Length == 0)
@@ -334,7 +336,7 @@ namespace Tashi.ConsensusEngine
 
             try
             {
-                tce_relay_create_session(_platform, relayApiKey, _sessionResultDelegate)
+                tce_relay_create_session(_platform, relayBaseUrl, relayApiKey, _sessionResultDelegate)
                     .SuccessOrThrow("tce_relay_create_session");
             }
             catch (Exception)
@@ -459,6 +461,7 @@ namespace Tashi.ConsensusEngine
             CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_relay_create_session(
             IntPtr platform,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string? baseUrl,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string? apiKey,
             OnSessionResult onSessionResult
         );

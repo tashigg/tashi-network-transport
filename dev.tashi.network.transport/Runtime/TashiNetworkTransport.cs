@@ -244,8 +244,6 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
-            // Environment.SetEnvironmentVariable("TCE_RELAY_BASE_URL", "http://localhost:8080");
-
             var bindEndPoint = Config.NetworkMode == TashiNetworkMode.UnityRelay
                 ? _secretKey.PublicKey.SyntheticEndpoint
                 : new IPEndPoint(IPAddress.Any, Config.BindPort);
@@ -441,6 +439,7 @@ namespace Tashi.NetworkTransport
                 _platform?.SetAddressBook(_addressBook);
 
                 _platform?.CreateRelaySession(
+                    Config.TashiRelayBaseUrl,
                     Config.TashiRelayApiKey,
                     entry =>
                     {
