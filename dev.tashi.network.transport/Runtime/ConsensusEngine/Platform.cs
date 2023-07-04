@@ -6,6 +6,7 @@ using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using Unity.Netcode;
 using Unity.Networking.Transport;
 using UnityEngine;
 
@@ -39,8 +40,16 @@ namespace Tashi.ConsensusEngine
             try
             {
                 NativeLogger.Init();
+
+                var logFilter = NetworkManager.Singleton.LogLevel switch {
+                    LogLevel.Developer => "tashi_consensus_engine=debug",
+                    LogLevel.Normal => "tashi_consensus_engine=info",
+                    LogLevel.Error => "tashi_consensus_engine=error",
+                    _ => "tashi_consensus_engine=off",
+                };
+
                 // The ordering of these two doesn't particularly matter.
-                NativeLogger.SetFilter("tashi_consensus_engine=debug");
+                NativeLogger.SetFilter(logFilter);
                 Debug.Log("logging initialized");
             }
             catch (Exception e)
