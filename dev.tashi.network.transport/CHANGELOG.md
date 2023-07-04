@@ -9,10 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-Tashi Relay will be used if an API key is set. This  is an alternative to Unity
-Relay which is optimized for our architecture. You can request an API key by
-joining our [Discord] server. Set your API key using the Unity Editor's
-Inspector for the TNT component.
+* Tashi Relay will be used if an API key is set. This  is an alternative to Unity
+  Relay which is optimized for our architecture. You can request an API key by
+  joining our [Discord] server. Set your API key using the Unity Editor's
+  Inspector for the TNT component.
+* NetworkManager's log level is now passed through to our native library to
+  allow you to tailor which log messages you see.
+
+### Changed
+
+* The LocalWithLobby example can now also work with Tashi Relay. In order to
+  achieve this TNT now provides a way to modify lobby and lobby player data.
+* The maximum session size when using Unity Relay has been set to 8.
+  If you would like to support larger, higher performance sessions you should
+  consider using Tashi Relay which is tailored to our architecture.
 
 ## [0.2.0]
 
