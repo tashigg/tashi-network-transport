@@ -1,14 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Tashi.ConsensusEngine;
 using Tashi.NetworkTransport;
 using TMPro;
 using Unity.Netcode;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
 using Unity.Services.Lobbies;
-using Unity.Services.Lobbies.Models;
 using UnityEngine;
 
 public class LocalWithLobby : MonoBehaviour
@@ -27,7 +23,6 @@ public class LocalWithLobby : MonoBehaviour
     private string PlayerId => AuthenticationService.Instance.PlayerId;
     private string _lobbyId;
     private bool _isLobbyHost;
-    private float _nextLobbyRefresh;
 
     public async void SignInButtonClicked()
     {
@@ -92,22 +87,6 @@ public class LocalWithLobby : MonoBehaviour
         _lobbyId = lobby.Id;
     }
 
-    private Dictionary<string, PlayerDataObject> GetPlayerData()
-    {
-        if (NetworkTransport.AddressBookEntry is null)
-        {
-            return new();
-        }
-
-        return new()
-        {
-            {
-                "AddressBookEntry",
-                new PlayerDataObject(PlayerDataObject.VisibilityOptions.Member, NetworkTransport.AddressBookEntry.Serialize())
-            }
-        };
-    }
-
     private void Start()
     {
         Debug.Log("Start");
@@ -130,18 +109,6 @@ public class LocalWithLobby : MonoBehaviour
         }
     }
 
-    private async Task SendPlayerDataToLobby()
-    {
-        var options = new UpdatePlayerOptions
-        {
-            Data = GetPlayerData(),
-        };
-
-        Debug.Log($"Sending AddressBookEntry = {NetworkTransport.AddressBookEntry?.Serialize()}");
-
-        await LobbyService.Instance.UpdatePlayerAsync(_lobbyId, PlayerId, options);
-    }
-
     void UpdateStatusText()
     {
         if (!string.IsNullOrEmpty(PlayerId))
@@ -153,53 +120,57 @@ public class LocalWithLobby : MonoBehaviour
             statusText.text = "";
         }
 
-        statusText.text += $"\n{_clientCount} / {NetworkTransport.Config.TotalNodes - 1} peer connections";
+        statusText.text += $"\n{_clientCount} peer connections";
     }
 
-    private async Task ApplyPlayerDataFromLobby()
-    {
-        var lobby = await LobbyService.Instance.GetLobbyAsync(_lobbyId);
-
-        foreach (var player in lobby.Players)
-        {
-            if (player.Id == PlayerId || player.Data == null)
-            {
-                continue;
-            }
-
-            if (!player.Data.TryGetValue("AddressBookEntry", out var addressBookEntryData))
-            {
-                Debug.LogError($"Player {player.Id} didn't provide an AddressBookEntry");
-                continue;
-            }
-
-            Debug.Log($"Received AddressBookEntry = {addressBookEntryData.Value}");
-
-            var entry = AddressBookEntry.Deserialize(addressBookEntryData.Value);
-            if (entry == null)
-            {
-                continue;
-            }
-
-            NetworkTransport.AddAddressBookEntry(entry, player.Id == lobby.HostId);
-        }
-    }
+    private float _nextHeartbeat;
+    private float _nextLobbyRefresh;
 
     private async void Update()
     {
-        if (!string.IsNullOrEmpty(_lobbyId) && !NetworkTransport.SessionHasStarted && Time.realtimeSinceStartup >= _nextLobbyRefresh)
+        if (string.IsNullOrEmpty(_lobbyId))
         {
-            _nextLobbyRefresh = Time.realtimeSinceStartup + 10;
+            return;
+        }
 
-            Debug.Log("Refreshing lobby data");
+        if (Time.realtimeSinceStartup >= _nextHeartbeat && _isLobbyHost)
+        {
+            _nextHeartbeat = Time.realtimeSinceStartup + 15;
+            await LobbyService.Instance.SendHeartbeatPingAsync(_lobbyId);
+        }
+
+        if (Time.realtimeSinceStartup >= _nextLobbyRefresh)
+        {
+            _nextLobbyRefresh = Time.realtimeSinceStartup + 2;
+
+            var outgoingSessionDetails = NetworkTransport.OutgoingSessionDetails;
+
+            var updatePlayerOptions = new UpdatePlayerOptions();
+            if (outgoingSessionDetails.AddTo(updatePlayerOptions))
+            {
+                await LobbyService.Instance.UpdatePlayerAsync(_lobbyId, PlayerId, updatePlayerOptions);
+            }
 
             if (_isLobbyHost)
             {
-                await LobbyService.Instance.SendHeartbeatPingAsync(_lobbyId);
+                var updateLobbyOptions = new UpdateLobbyOptions();
+                if (outgoingSessionDetails.AddTo(updateLobbyOptions))
+                {
+                    await LobbyService.Instance.UpdateLobbyAsync(_lobbyId, updateLobbyOptions);
+                }
             }
 
-            await SendPlayerDataToLobby();
-            await ApplyPlayerDataFromLobby();
+            if (!NetworkTransport.SessionHasStarted)
+            {
+                var lobby = await LobbyService.Instance.GetLobbyAsync(_lobbyId);
+                var incomingSessionDetails = IncomingSessionDetails.FromUnityLobby(lobby);
+
+                // This should be replaced with whatever logic you use to determine when a lobby is locked in.
+                if (incomingSessionDetails.AddressBook.Count == 2)
+                {
+                    NetworkTransport.UpdateSessionDetails(incomingSessionDetails);
+                }
+            }
         }
     }
 }

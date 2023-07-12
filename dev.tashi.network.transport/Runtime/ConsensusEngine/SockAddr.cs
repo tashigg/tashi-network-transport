@@ -134,6 +134,30 @@ namespace Tashi.ConsensusEngine
             return addrOut;
         }
 
+        // `socklen_t` is defined to be 32 bits (signed on Windows, unsigned on *Nix but it doesn't really matter).
+        internal static SockAddr FromPtr(IntPtr sockAddr, uint sockAddrLen)
+        {
+            // A `sockaddr` must always at least contain a 2-byte address family value,
+            // and is defined to be 128 bytes or less.
+            if (sockAddrLen is < 2 or > 128)
+            {
+                throw new ArgumentException($"sockAddrLen out of range: {sockAddrLen}");
+            }
+
+            var sockAddrOut = new SockAddr();
+            sockAddrOut._data = new byte[126];
+
+            // This is one place we actually do want to use native endianness, as that's how it's specified.
+            sockAddrOut._addressFamily = (ushort)Marshal.ReadInt16(sockAddr);
+            
+            // Offset to the actual data.
+            var sockAddrData = sockAddr + 2;
+
+            Marshal.Copy(sockAddrData, sockAddrOut._data, 0, (int) sockAddrLen - 2);
+
+            return sockAddrOut;
+        }
+
         public override string ToString()
         {
             return $"{IPEndPoint} (clientId = {ClientId})";

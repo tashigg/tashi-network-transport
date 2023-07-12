@@ -2,12 +2,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Unity.Jobs;
 using Unity.Networking.Transport;
 using Unity.Networking.Transport.Relay;
 using Unity.Services.Relay;
@@ -31,7 +28,7 @@ namespace Tashi.ConsensusEngine
 
         public ExternalConnectionManager(Platform platform, ushort totalNodes, ulong localClientId)
         {
-            Debug.Assert(totalNodes > 0);
+            Debug.Assert(totalNodes > 1);
 
             _platform = platform;
             _peerNodesCount = (ushort)(totalNodes - 1);
@@ -61,7 +58,10 @@ namespace Tashi.ConsensusEngine
         {
             var sockAddr = SockAddr.FromClientId(remoteClientId);
 
-            if (_externalConnections.ContainsKey(sockAddr)) return;
+            if (_externalConnections.ContainsKey(sockAddr) || _pendingConnections.Contains(sockAddr))
+            {
+                return;
+            }
 
             _pendingConnections.Add(sockAddr);
             var connection = await ExternalConnection.ConnectAsync(_localClientId, remoteClientId, joinCode);
@@ -73,6 +73,8 @@ namespace Tashi.ConsensusEngine
 
         public void Update()
         {
+            _externalListener?.Update(_platform);
+
             foreach (var conn in _externalConnections)
             {
                 conn.Value.Update(_platform);
@@ -106,8 +108,6 @@ namespace Tashi.ConsensusEngine
                 
                 conn.Send(transmit);
             }
-
-            _externalListener?.Update(_platform);
         }
 
         public void Dispose()
@@ -253,6 +253,8 @@ namespace Tashi.ConsensusEngine
         internal static async Task<ExternalListener> BindAsync(int peerCount)
         {
             var allocation = await RelayService.Instance.CreateAllocationAsync(peerCount + 1);
+            Debug.Log($"Created a Unity Relay allocation with {peerCount + 1} maximum connections");
+
 
             var serverData = new RelayServerData(allocation, "udp");
 
@@ -271,7 +273,7 @@ namespace Tashi.ConsensusEngine
                 throw new Exception("Host client failed to listen");
             }
 
-            return new ExternalListener(networkDriver: networkDriver, allocation: allocation);
+            return new ExternalListener(networkDriver, allocation);
         }
 
         internal async Task<String> GetJoinCode()

@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -10,21 +9,24 @@ using System.Threading.Tasks;
 using Unity.Netcode;
 using UnityEngine;
 using Tashi.ConsensusEngine;
-using UnityEngine.Serialization;
+using UnityEngine.Assertions;
 
 namespace Tashi.NetworkTransport
 {
     [AddComponentMenu("Netcode/Tashi Network Transport")]
     public class TashiNetworkTransport : Unity.Netcode.NetworkTransport
     {
+        public override ulong ServerClientId { get; }
+
         public TashiNetworkTransportEditorConfig Config = new();
-        public AddressBookEntry? AddressBookEntry;
+
+        public bool SessionHasStarted => _state == State.Running;
+        public OutgoingSessionDetails OutgoingSessionDetails { get; private set; }
 
         public delegate void OnPlatformInitHandler(object sender);
+        public  OnPlatformInitHandler? OnPlatformInit;
 
-        public bool SessionHasStarted { get; private set; }
-        public event OnPlatformInitHandler? OnPlatformInit;
-
+        private const ushort MaximumSessionSize = 8;
         private Platform? _platform;
         private SecretKey _secretKey;
         private List<AddressBookEntry> _addressBook = new();
@@ -39,10 +41,9 @@ namespace Tashi.NetworkTransport
 
         private ExternalConnectionManager? _externalConnectionManager;
 
-        private static readonly NetworkMode NetworkMode = NetworkMode.External;
-
         TashiNetworkTransport()
         {
+            OutgoingSessionDetails = new OutgoingSessionDetails();
             _secretKey = SecretKey.Generate();
             PublicKey publicKey = _secretKey.PublicKey;
             _clientId = publicKey.ClientId;
@@ -200,8 +201,6 @@ namespace Tashi.NetworkTransport
                 return NetworkEvent.Nothing;
             }
             
-            _externalConnectionManager?.Update();
-
             while (ProcessEvent())
             {
             }
@@ -209,7 +208,16 @@ namespace Tashi.NetworkTransport
             return NetworkEvent.Nothing;
         }
 
-        public void Update()
+        private enum State
+        {
+            WaitingForSessionDetails,
+            WaitingForTashiRelay,
+            Running,
+        }
+
+        private State _state = State.WaitingForSessionDetails;
+
+        private void Update()
         {
             _externalConnectionManager?.Update();
         }
@@ -236,22 +244,22 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
-            IPEndPoint bindEndPoint = NetworkMode == NetworkMode.External
+            var bindEndPoint = Config.NetworkMode == TashiNetworkMode.UnityRelay
                 ? _secretKey.PublicKey.SyntheticEndpoint
                 : new IPEndPoint(IPAddress.Any, Config.BindPort);
 
             _platform = new Platform(
-                NetworkMode,
+                Config.NetworkMode.ToTceNetworkMode(),
                 bindEndPoint,
                 TimeSpan.FromMilliseconds(Config.SyncInterval),
                 _secretKey
             );
 
-            if (NetworkMode == NetworkMode.External)
+            if (Config.NetworkMode == TashiNetworkMode.UnityRelay)
             {
                 Debug.Log("binding in external mode");
                 
-                var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, Config.TotalNodes, _secretKey.PublicKey.ClientId);
+                var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, MaximumSessionSize, _secretKey.PublicKey.ClientId);
                 
                 // C#'s task system is markedly different from Rust's: in Rust, the consumer of a `Future`
                 // is responsible for driving it forward unless explicitly spawned into a runtime,
@@ -271,6 +279,7 @@ namespace Tashi.NetworkTransport
                     {
                         if (bindTask.IsCompletedSuccessfully)
                         {
+                            Debug.Log($"Unity Relay allocation completed, the join code is {bindTask.Result}");
                             InitFinished(new ExternalAddressBookEntry(bindTask.Result, _secretKey.PublicKey));
                         }
                         else
@@ -290,7 +299,7 @@ namespace Tashi.NetworkTransport
 
         private void InitFinished(AddressBookEntry addressBookEntry)
         {
-            AddressBookEntry = addressBookEntry;
+            OutgoingSessionDetails.AddressBookEntry = addressBookEntry;
             AddAddressBookEntry(addressBookEntry, _isServer);
             OnPlatformInit?.Invoke(this);
         }
@@ -317,7 +326,7 @@ namespace Tashi.NetworkTransport
         {
             Debug.Log("TNT Shutdown");
             _platform?.Dispose();
-            SessionHasStarted = false;
+            _state = State.WaitingForSessionDetails;
             _externalConnectionManager?.Dispose();
         }
 
@@ -326,9 +335,31 @@ namespace Tashi.NetworkTransport
             Debug.Log("TNT Initialize");
         }
 
-        public override ulong ServerClientId { get; }
+        public void UpdateSessionDetails(IncomingSessionDetails sessionDetails)
+        {
+            if (sessionDetails.AddressBook.Count > MaximumSessionSize)
+            {
+                throw new Exception($"The maximum supported session size is {MaximumSessionSize}");
+            }
 
-        public void AddAddressBookEntry(AddressBookEntry entry, bool treatAsHost)
+            Debug.Log($"Applying incoming session data with {sessionDetails.AddressBook.Count} entries");
+
+            foreach (var entry in sessionDetails.AddressBook)
+            {
+                AddAddressBookEntry(entry, entry == sessionDetails.Host);
+            }
+
+            if (_isServer)
+            {
+                BeginHostSessionSetup();
+            }
+            else
+            {
+                BeginClientSessionSetup(sessionDetails.TashiRelay);
+            }
+        }
+
+        private void AddAddressBookEntry(AddressBookEntry entry, bool treatAsHost)
         {
             if (_addressBook.Contains(entry))
             {
@@ -349,7 +380,7 @@ namespace Tashi.NetworkTransport
             {
                 if (_externalConnectionManager == null)
                 {
-                    Debug.Log($"Received external address book entry in non-external mode: {external}");
+                    Debug.LogError($"Received external address book entry in non-external mode: {external}");
                     return;
                 }
 
@@ -361,13 +392,13 @@ namespace Tashi.NetworkTransport
                     // Only attempt to connect to another peer.
                     _externalConnectionManager.ConnectAsync(external.PublicKey.ClientId, external.RelayJoinCode)
                         .ContinueWith(task =>
-                        {
-                            if (task.IsFaulted)
                             {
-                                Debug.LogWarning($"failed to connect to {external.PublicKey.ClientId} with join code {external.RelayJoinCode}");
-                                Debug.LogException(task.Exception);
-                            }
-                        },
+                                if (task.IsFaulted)
+                                {
+                                    Debug.LogWarning($"failed to connect to {external.PublicKey.ClientId} with join code {external.RelayJoinCode}");
+                                    Debug.LogException(task.Exception);
+                                }
+                            },
                             TaskScheduler.FromCurrentSynchronizationContext());
                 }
 #pragma warning restore CS4014
@@ -388,34 +419,87 @@ namespace Tashi.NetworkTransport
             }
 
             _addressBook.Add(entry);
-
-            Debug.Log($"Discovered {_addressBook.Count} of {Config.TotalNodes}");
-
-            if (_addressBook.Count == Config.TotalNodes && !SessionHasStarted)
-            {
-                StartSyncing();
-            }
         }
 
-        private void StartSyncing()
+        private void BeginHostSessionSetup()
         {
-            if (_platform == null)
+            Assert.IsNotNull(_platform);
+
+            if (!string.IsNullOrWhiteSpace(Config.TashiRelayApiKey))
             {
-                throw new InvalidOperationException("_platform is null");
+                if (_state == State.WaitingForTashiRelay)
+                {
+                    Debug.Log("Still waiting for a Tashi Relay allocation");
+                    return;
+                }
+
+                Debug.Log($"Requesting a Tashi Relay allocation");
+                _state = State.WaitingForTashiRelay;
+
+                _platform?.SetAddressBook(_addressBook);
+
+                _platform?.CreateRelaySession(
+                    Config.TashiRelayBaseUrl,
+                    Config.TashiRelayApiKey,
+                    entry =>
+                    {
+                        Debug.Log(
+                            $"The Tashi Relay has been allocated: {entry.Address}:{entry.Port}");
+                        OutgoingSessionDetails.TashiRelay = entry;
+                        CompleteSessionSetup();
+                    },
+                    e =>
+                    {
+                        Debug.LogException(e);
+                        _state = State.WaitingForSessionDetails;
+                    }
+                );
+
+                return;
             }
 
-            Debug.Log($"StartSyncing for client ID {_clientId}");
+            Debug.Log("Tashi Relay isn't being used");
+            CompleteSessionSetup();
+        }
 
+        private void BeginClientSessionSetup(DirectAddressBookEntry? tashiRelay)
+        {
+            Assert.IsNotNull(_platform);
+
+            if (!string.IsNullOrWhiteSpace(Config.TashiRelayApiKey))
+            {
+                if (tashiRelay is not null)
+                {
+                    Debug.Log($"Tashi Relay is now available: {tashiRelay}");
+                    AddAddressBookEntry(tashiRelay, false);
+                    CompleteSessionSetup();
+                }
+                else
+                {
+                    Debug.Log("Waiting for the host to share the Tashi Relay allocation");
+                }
+
+                return;
+            }
+
+            CompleteSessionSetup();
+        }
+
+        private void CompleteSessionSetup()
+        {
             try
             {
-                _platform.Start(_addressBook);
-                SessionHasStarted = true;
+                // FIXME: Handle re-initializing _platform if we need to call tce_start again.
+
+                _platform?.Start(_addressBook);
+                _state = State.Running;
 
                 // TAS-76
-                _platform.Send(Encoding.ASCII.GetBytes("Hi"));
+                _platform?.Send(Encoding.ASCII.GetBytes("Hi"));
             }
             catch (Exception e)
             {
+                _state = State.WaitingForSessionDetails;
                 Debug.LogException(e);
             }
         }

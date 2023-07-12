@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - Unreleased
+
+### Added
+
+* Tashi Relay will be used if an API key is set. This  is an alternative to Unity
+  Relay which is optimized for our architecture. You can request an API key by
+  joining our [Discord] server. Set your API key using the Unity Editor's
+  Inspector for the TNT component.
+* NetworkManager's log level is now passed through to our native library to
+  allow you to tailor which log messages you see.
+
+### Changed
+
+* The LocalWithLobby example can now also work with Tashi Relay. In order to
+  achieve this TNT now provides a way to modify lobby and lobby player data.
+* The maximum session size when using Unity Relay has been set to 8.
+  If you would like to support larger, higher performance sessions you should
+  consider using Tashi Relay which is tailored to our architecture.
+
 ## [0.2.0]
 
 ### Added
@@ -40,5 +59,7 @@ but it enables people to start using TNT immediately.
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
+[Discord]: https://discord.com/invite/fPNdgUCGnk
+[0.3.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.2.0
 [0.1.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.1.0

@@ -5,17 +5,19 @@ using System.Collections.Generic;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
-using Unity.Collections;
+using System.Threading;
+using Unity.Netcode;
 using Unity.Networking.Transport;
 using UnityEngine;
 
 namespace Tashi.ConsensusEngine
 {
+    // NOTE: this should match `TceNetworkMode` in TCE or things will get weird.
     public enum NetworkMode
     {
         Loopback,
         Local,
-        External
+        External,
     }
 
     /// <summary>
@@ -30,7 +32,7 @@ namespace Tashi.ConsensusEngine
         private ulong _clientId;
 
         // Unity Relay enforces a limit of 1400 bytes per each datagram.
-        private static UInt64 MaxRelayDataLen = 1400;
+        private static readonly UInt64 MaxRelayDataLen = 1400;
 
         static Platform()
         {
@@ -38,8 +40,16 @@ namespace Tashi.ConsensusEngine
             try
             {
                 NativeLogger.Init();
+
+                var logFilter = NetworkManager.Singleton.LogLevel switch {
+                    LogLevel.Developer => "tashi_consensus_engine=debug",
+                    LogLevel.Normal => "tashi_consensus_engine=info",
+                    LogLevel.Error => "tashi_consensus_engine=error",
+                    _ => "tashi_consensus_engine=off",
+                };
+
                 // The ordering of these two doesn't particularly matter.
-                NativeLogger.SetFilter("tashi_consensus_engine=info");
+                NativeLogger.SetFilter(logFilter);
                 Debug.Log("logging initialized");
             }
             catch (Exception e)
@@ -57,11 +67,11 @@ namespace Tashi.ConsensusEngine
         public Platform(NetworkMode mode, IPEndPoint bindEndPoint, TimeSpan syncInterval, SecretKey secretKey)
         {
             _clientId = secretKey.PublicKey.ClientId;
-            
+
             _platform = tce_init(
                 mode,
                 bindEndPoint.Address.ToString(),
-                (ushort) bindEndPoint.Port,
+                (ushort)bindEndPoint.Port,
                 // FIXME: Ensure the conversion can succeed
                 (UInt32)syncInterval.TotalMilliseconds,
                 secretKey.Der,
@@ -74,7 +84,7 @@ namespace Tashi.ConsensusEngine
                 throw new ArgumentException($"Failed to initialize the platform: {result}");
             }
         }
-        
+
         /// <summary>
         /// If a port wasn't specified, or if port 0 was specified then this
         /// function will help in determining which port was actually used.
@@ -104,8 +114,13 @@ namespace Tashi.ConsensusEngine
             );
         }
 
-        private void SetAddressBook(IList<AddressBookEntry> entries)
+        public void SetAddressBook(IList<AddressBookEntry> entries)
         {
+            if (_started)
+            {
+                throw new InvalidOperationException("The platform has already been started");
+            }
+
             foreach (var entry in entries)
             {
                 String address;
@@ -137,14 +152,12 @@ namespace Tashi.ConsensusEngine
             }
         }
 
-        public void Start(IList<AddressBookEntry> entries)
+        public void Start()
         {
             if (_started)
             {
                 throw new InvalidOperationException("The platform has already been started");
             }
-
-            SetAddressBook(entries);
 
             var result = tce_start(_platform);
             switch (result)
@@ -157,6 +170,18 @@ namespace Tashi.ConsensusEngine
                 default:
                     throw new InvalidOperationException($"Failed to start the platform: {result}");
             }
+        }
+
+        public void Start(IList<AddressBookEntry> entries)
+        {
+            if (_started)
+            {
+                throw new InvalidOperationException("The platform has already been started");
+            }
+
+            SetAddressBook(entries);
+
+            Start();
         }
 
         /// <summary>
@@ -205,6 +230,7 @@ namespace Tashi.ConsensusEngine
                 {
                     Debug.Log($"error from tce_external_transmit_get: {result}");
                 }
+
                 return null;
             }
 
@@ -226,20 +252,97 @@ namespace Tashi.ConsensusEngine
             // Kind of baffling that this is actually necessary.
             // It should just take a capacity and return the number of bytes written.
             var bytesAvailable = stream.Length - stream.GetBytesRead();
-            
-            var readLen = Math.Min(bytesAvailable, (int) bufLen);
-            
+
+            var readLen = Math.Min(bytesAvailable, (int)bufLen);
+
             unsafe
             {
                 // SAFETY: `buf` is valid for up to `MaxRelayDataLen`
-                stream.ReadBytes((byte*) buf, readLen);
+                stream.ReadBytes((byte*)buf, readLen);
             }
 
-            result = tce_external_recv_commit(_platform, (UInt64)readLen, ref addr, addr.Len);
+            result = tce_external_recv_commit(_platform, (UInt64)readLen, ref addr, (UInt32)addr.Len);
 
             if (result != Result.Success)
             {
                 Debug.LogWarning($"error from tce_external_recv_commit: {result}");
+            }
+        }
+
+        private OnSessionResult? _sessionResultDelegate;
+
+        /// <summary>
+        /// Asynchronously create a Tashi Relay session with the given API key.
+        ///
+        /// On success, the first delegate will be invoked with the Relay server's address book entry.
+        ///
+        /// On error, the second delegate will be invoked.
+        /// </summary>
+        /// <param name="relayBaseUrl"></param>
+        /// <param name="relayApiKey"></param>
+        /// <param name="onRelayAddressBookEntry"></param>
+        /// <param name="onError"></param>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="InvalidOperationException"></exception>
+        public void CreateRelaySession(string relayBaseUrl, string relayApiKey,
+            Action<DirectAddressBookEntry> onRelayAddressBookEntry,
+            Action<Exception> onError)
+        {
+            if (relayApiKey.Length == 0)
+            {
+                throw new ArgumentException("relayApiKey is empty");
+            }
+
+            if (_sessionResultDelegate != null)
+            {
+                throw new InvalidOperationException("CreateRelaySession call already in-flight");
+            }
+
+            if (_started)
+            {
+                throw new InvalidOperationException("Platform already started");
+            }
+
+            var syncContext = SynchronizationContext.Current;
+
+            // We need to retain this instance until the call completes or the platform instance is destroyed
+            // so it doesn't get garbage collected while the async call is still running.
+            //
+            // If we get random segfaults after calling this method, then this is likely a faulty approach. 
+            _sessionResultDelegate =
+                (result, relayPublicKeyDer, relayPublicKeyDerLen, relaySockAddr, relaySockAddrLen) =>
+                {
+                    try
+                    {
+                        result.SuccessOrThrow("tce_relay_create_session");
+
+                        var publicKey = PublicKey.FromPtr(relayPublicKeyDer, relayPublicKeyDerLen);
+                        var sockAddr = SockAddr.FromPtr(relaySockAddr, relaySockAddrLen);
+
+                        var entry = new DirectAddressBookEntry(sockAddr.IPEndPoint, publicKey);
+
+                        syncContext.Post(_ => onRelayAddressBookEntry(entry), null);
+                    }
+                    catch (Exception e)
+                    {
+                        syncContext.Post(_ => onError(e), null);
+                    }
+                    finally
+                    {
+                        // Allow the call to be retried if it failed.
+                        _sessionResultDelegate = null;
+                    }
+                };
+
+            try
+            {
+                tce_relay_create_session(_platform, relayBaseUrl, relayApiKey, _sessionResultDelegate)
+                    .SuccessOrThrow("tce_relay_create_session");
+            }
+            catch (Exception)
+            {
+                _sessionResultDelegate = null;
+                throw;
             }
         }
 
@@ -286,7 +389,8 @@ namespace Tashi.ConsensusEngine
             out Result result
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_bound_address_get", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_bound_address_get",
+            CallingConvention = CallingConvention.Cdecl)]
         static extern Int32 tce_bound_address_get(
             IntPtr platform,
             [MarshalAs(UnmanagedType.LPUTF8Str)] StringBuilder buffer,
@@ -318,34 +422,52 @@ namespace Tashi.ConsensusEngine
             UInt32 len
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get",
+            CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_transmit_get(
             IntPtr platform,
             out IntPtr transmitOut
         );
-        
+
         // other tce_external_transmit bindings are in `ExternalConnectionManager.cs`
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare",
+            CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_recv_prepare(
             IntPtr platform,
             UInt64 bufCapacity,
             out IntPtr buf,
             out UInt64 len
         );
-        
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_commit", CallingConvention = CallingConvention.Cdecl)]
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_commit",
+            CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_recv_commit(
             IntPtr platform,
             UInt64 writtenLen,
             ref SockAddr sockAddr,
-            UInt64 sockAddrLen
+            // `socklen_t` is defined to be 32 bits
+            UInt32 sockAddrLen
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_event_free", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_event_free",
+            CallingConvention = CallingConvention.Cdecl)]
         static extern void tce_event_free(IntPtr consensusEvent);
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_free", CallingConvention = CallingConvention.Cdecl)]
         static extern void tce_free(IntPtr platform);
+
+        [DllImport("tashi_consensus_engine", EntryPoint = "tce_relay_create_session",
+            CallingConvention = CallingConvention.Cdecl)]
+        static extern Result tce_relay_create_session(
+            IntPtr platform,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string? baseUrl,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string? apiKey,
+            OnSessionResult onSessionResult
+        );
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate void OnSessionResult(Result result, IntPtr relayPublicKeyDer, UIntPtr relayPublicKeyDerLen,
+            IntPtr relaySockAddr, UInt32 relaySockAddrLen);
     }
 }

@@ -6,7 +6,8 @@
         "Unity.Services.Relay",
         "Unity.Networking.Transport",
         "Unity.Collections",
-        "Unity.Burst"
+        "Unity.Burst",
+        "Unity.Services.Lobbies"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
