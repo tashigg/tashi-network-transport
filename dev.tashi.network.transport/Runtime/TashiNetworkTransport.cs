@@ -18,13 +18,29 @@ namespace Tashi.NetworkTransport
     {
         public override ulong ServerClientId { get; }
 
+        /// <summary>
+        /// The <see cref="TashiNetworkTransportEditorConfig"/> used to configure the network transport. This is set
+        /// automatically.
+        /// </summary>
         public TashiNetworkTransportEditorConfig Config = new();
 
+        /// <summary>
+        /// Determines whether the session state is <c>Running</c>. This is intended to help determine when the lobby
+        /// should be left or closed for games that don't allow new players to join after it has started.
+        /// </summary>
         public bool SessionHasStarted => _state == State.Running;
+
+        /// <summary>
+        /// Session details that should be shared with other players.
+        /// </summary>
         public OutgoingSessionDetails OutgoingSessionDetails { get; private set; }
 
         public delegate void OnPlatformInitHandler(object sender);
-        public  OnPlatformInitHandler? OnPlatformInit;
+
+        /// <summary>
+        /// A delegate that will be called once the Tashi Consensus Engine has successfully initialized.
+        /// </summary>
+        public OnPlatformInitHandler? OnPlatformInit;
 
         private const ushort MaximumSessionSize = 8;
         private Platform? _platform;

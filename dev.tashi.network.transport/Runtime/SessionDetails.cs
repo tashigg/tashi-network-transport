@@ -8,12 +8,33 @@ using UnityEngine;
 
 namespace Tashi.NetworkTransport
 {
+    /// <summary>
+    /// Session details that have been received from other players.
+    /// </summary>
     public class IncomingSessionDetails
     {
+        /// <summary>
+        /// An optional <see cref="DirectAddressBookEntry"/> that specifies the address of an allocated Tashi Relay
+        /// server. This is provided by the initial session host. A Tashi Relay isn't always necessary, but it can aid
+        /// in bypassing NAT and firewalls for many players.
+        /// </summary>
         public DirectAddressBookEntry? TashiRelay;
+
+        /// <summary>
+        /// A list of <see cref="AddressBookEntry"/> that is used to define the initial session address book.
+        /// </summary>
         public List<AddressBookEntry> AddressBook = new();
+
+        /// <summary>
+        /// The session host's <see cref="AddressBookEntry"/>.
+        /// </summary>
         public AddressBookEntry? Host;
 
+        /// <summary>
+        /// Creates a <see cref="IncomingSessionDetails"/> from a <see cref="Lobby"/>.
+        /// </summary>
+        /// <param name="lobby">The Unity lobby to load player and host data from.</param>
+        /// <returns>An <see cref="IncomingSessionDetails"/> with as many details filled in as possible.</returns>
         public static IncomingSessionDetails FromUnityLobby(Lobby lobby)
         {
             var sessionDetails = new IncomingSessionDetails();
@@ -54,9 +75,21 @@ namespace Tashi.NetworkTransport
         }
     }
 
+    /// <summary>
+    /// Session details that should be shared with other players.
+    /// </summary>
     public class OutgoingSessionDetails
     {
+        /// <summary>
+        /// An optional <see cref="DirectAddressBookEntry"/> that specifies the address of an allocated Tashi Relay
+        /// server. This is provided by the initial session host. A Tashi Relay isn't always necessary, but it can aid
+        /// in bypassing NAT and firewalls for many players.
+        /// </summary>
         public DirectAddressBookEntry? TashiRelay;
+
+        /// <summary>
+        /// The local <see cref="AddressBookEntry"/> that will enable other players to attempt a connection.
+        /// </summary>
         public AddressBookEntry? AddressBookEntry;
 
         private int _lastUpdatePlayerOptionsHash;
@@ -66,7 +99,7 @@ namespace Tashi.NetworkTransport
         /// Adds the required data to <see cref="UpdatePlayerOptions"/>, which must be sent to the lobby.
         /// </summary>
         /// <param name="playerOptions"></param>
-        /// <returns>True if the data added has been updated since the last call.</returns>
+        /// <returns><c>true</c> if the data added has been updated since the last call.</returns>
         public bool AddTo(UpdatePlayerOptions playerOptions)
         {
             if (AddressBookEntry is null)
@@ -97,7 +130,7 @@ namespace Tashi.NetworkTransport
         /// Adds the required data to <see cref="UpdateLobbyOptions"/>, which must be sent to the lobby.
         /// </summary>
         /// <param name="lobbyOptions"></param>
-        /// <returns>True if the data added has been updated since the last call.</returns>
+        /// <returns><c>true</c> if the data added has been updated since the last call.</returns>
         public bool AddTo(UpdateLobbyOptions lobbyOptions)
         {
             if (TashiRelay is null)
