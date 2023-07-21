@@ -37,7 +37,6 @@ namespace Tashi.ConsensusEngine
             Converters = new JsonConverter[] { new IPAddressConverter() }
         };
 
-
         protected AddressBookEntry(PublicKey publicKey)
         {
             PublicKey = publicKey;

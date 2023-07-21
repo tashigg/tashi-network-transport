@@ -452,8 +452,6 @@ namespace Tashi.NetworkTransport
                 Debug.Log($"Requesting a Tashi Relay allocation");
                 _state = State.WaitingForTashiRelay;
 
-                _platform?.SetAddressBook(_addressBook);
-
                 _platform?.CreateRelaySession(
                     Config.TashiRelayBaseUrl,
                     Config.TashiRelayApiKey,
@@ -462,6 +460,11 @@ namespace Tashi.NetworkTransport
                         Debug.Log(
                             $"The Tashi Relay has been allocated: {entry.Address}:{entry.Port}");
                         OutgoingSessionDetails.TashiRelay = entry;
+
+                        // Setting the relay as the host might be a good idea
+                        // until we try using a virtual host.
+                        AddAddressBookEntry(entry, false);
+
                         CompleteSessionSetup();
                     },
                     e =>
@@ -503,6 +506,8 @@ namespace Tashi.NetworkTransport
 
         private void CompleteSessionSetup()
         {
+            _platform?.SetAddressBook(_addressBook);
+
             try
             {
                 // FIXME: Handle re-initializing _platform if we need to call tce_start again.
