@@ -30,6 +30,7 @@ namespace Tashi.ConsensusEngine
     public abstract class AddressBookEntry : IEquatable<AddressBookEntry>
     {
         public PublicKey PublicKey;
+        public readonly bool IsRelay;
 
         private static JsonSerializerSettings _jsonSerializerSettings = new()
         {
@@ -37,9 +38,10 @@ namespace Tashi.ConsensusEngine
             Converters = new JsonConverter[] { new IPAddressConverter() }
         };
 
-        protected AddressBookEntry(PublicKey publicKey)
+        protected AddressBookEntry(PublicKey publicKey, bool isRelay)
         {
             PublicKey = publicKey;
+            IsRelay = isRelay;
         }
 
         public string Serialize()
@@ -64,7 +66,13 @@ namespace Tashi.ConsensusEngine
         public IPEndPoint EndPoint => new(Address, Port);
 
         [JsonConstructor]
-        public DirectAddressBookEntry(IPAddress address, int port, PublicKey publicKey) : base(publicKey)
+        public DirectAddressBookEntry(IPAddress address, int port, PublicKey publicKey) : base(publicKey, false)
+        {
+            Address = address;
+            Port = port;
+        }
+        
+        public DirectAddressBookEntry(IPAddress address, int port, PublicKey publicKey, bool isRelay) : base(publicKey, isRelay)
         {
             Address = address;
             Port = port;
@@ -74,6 +82,10 @@ namespace Tashi.ConsensusEngine
         {
         }
 
+        public DirectAddressBookEntry(IPEndPoint endPoint, PublicKey publicKey, bool isRelay) : this(endPoint.Address, endPoint.Port, publicKey, isRelay)
+        {
+        }
+        
         public new static DirectAddressBookEntry? Deserialize(string? data)
         {
             var entry = AddressBookEntry.Deserialize(data);
@@ -100,7 +112,7 @@ namespace Tashi.ConsensusEngine
     {
         public readonly string RelayJoinCode;
         
-        public ExternalAddressBookEntry(string relayJoinCode, PublicKey publicKey) : base(publicKey)
+        public ExternalAddressBookEntry(string relayJoinCode, PublicKey publicKey) : base(publicKey, false)
         {
             RelayJoinCode = relayJoinCode;
         }
