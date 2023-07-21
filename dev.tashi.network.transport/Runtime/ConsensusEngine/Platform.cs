@@ -142,7 +142,8 @@ namespace Tashi.ConsensusEngine
                     _platform,
                     address,
                     entry.PublicKey.Der,
-                    (uint)entry.PublicKey.Der.Length
+                    (uint)entry.PublicKey.Der.Length,
+                    entry.IsRelay
                 );
 
                 if (result != Result.Success)
@@ -319,7 +320,7 @@ namespace Tashi.ConsensusEngine
                         var publicKey = PublicKey.FromPtr(relayPublicKeyDer, relayPublicKeyDerLen);
                         var sockAddr = SockAddr.FromPtr(relaySockAddr, relaySockAddrLen);
 
-                        var entry = new DirectAddressBookEntry(sockAddr.IPEndPoint, publicKey);
+                        var entry = new DirectAddressBookEntry(sockAddr.IPEndPoint, publicKey, true);
 
                         syncContext.Post(_ => onRelayAddressBookEntry(entry), null);
                     }
@@ -403,7 +404,8 @@ namespace Tashi.ConsensusEngine
             IntPtr platform,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string address,
             byte[] publicKeyDer,
-            UInt32 publicKeyDerLen
+            UInt32 publicKeyDerLen,
+            bool isRelay
         );
 
         [DllImport("tashi_consensus_engine", EntryPoint = "tce_start", CallingConvention = CallingConvention.Cdecl)]
