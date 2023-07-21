@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * The maximum session size when using Unity Relay has been set to 8.
   If you would like to support larger, higher performance sessions you should
   consider using Tashi Relay which is tailored to our architecture.
+* Significant improvements to latency, CPU usage, and memory usage.
 
 ## [0.2.0]
 
