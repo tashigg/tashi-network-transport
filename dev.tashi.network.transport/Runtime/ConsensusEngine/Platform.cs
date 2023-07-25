@@ -42,7 +42,7 @@ namespace Tashi.ConsensusEngine
                 NativeLogger.Init();
 
                 var logFilter = NetworkManager.Singleton.LogLevel switch {
-                    LogLevel.Developer => "tashi_consensus_engine=debug",
+                    LogLevel.Developer => "tashi_consensus_engine=debug,tashi_address_book=debug",
                     LogLevel.Normal => "tashi_consensus_engine=info",
                     LogLevel.Error => "tashi_consensus_engine=error",
                     _ => "tashi_consensus_engine=off",
