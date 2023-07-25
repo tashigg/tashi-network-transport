@@ -449,6 +449,9 @@ namespace Tashi.NetworkTransport
                     return;
                 }
 
+                // Important: populate TCE's address book before we try to create the Relay session.
+                _platform?.SetAddressBook(_addressBook);
+                
                 Debug.Log($"Requesting a Tashi Relay allocation");
                 _state = State.WaitingForTashiRelay;
 
