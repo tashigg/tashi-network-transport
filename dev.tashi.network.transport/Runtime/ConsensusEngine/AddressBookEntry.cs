@@ -30,7 +30,7 @@ namespace Tashi.ConsensusEngine
     public abstract class AddressBookEntry : IEquatable<AddressBookEntry>
     {
         public PublicKey PublicKey;
-        public readonly bool IsRelay;
+        public bool IsRelay;
 
         private static JsonSerializerSettings _jsonSerializerSettings = new()
         {
