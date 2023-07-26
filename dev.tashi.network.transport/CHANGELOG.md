@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   latency.
 * The default Tashi Relay URL now points to our East US service.
 * Tashi Relay's API key is now masked in the inspector by default.
+* The default editor version for the Examples project is now 2022.3.5f1.
+* The Examples project asset now includes TNT.
 
 ## [0.3.0]
 
