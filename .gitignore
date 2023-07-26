@@ -5,3 +5,4 @@
 *.so
 *.dll.meta
 *.blob
+/Examples/Packages/dev.tashi.network.transport
