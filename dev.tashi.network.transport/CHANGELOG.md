@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Significant performance improvements in terms of CPU, memory and lower
   latency.
 * The default Tashi Relay URL now points to our East US service.
+* Tashi Relay's API key is now masked in the inspector by default.
 
 ## [0.3.0]
 
