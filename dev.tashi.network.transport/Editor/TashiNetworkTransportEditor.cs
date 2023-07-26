@@ -17,6 +17,7 @@ namespace Tashi.NetworkTransport
         private SerializedProperty m_NetworkMode;
         private SerializedProperty m_TashiRelayBaseUrl;
         private SerializedProperty m_TashiRelayApiKey;
+        private bool m_ShowApiKey;
 
         void OnEnable()
         {
@@ -37,7 +38,15 @@ namespace Tashi.NetworkTransport
             if (m_NetworkMode.enumValueIndex == (int)TashiNetworkMode.TashiRelay)
             {
                 EditorGUILayout.PropertyField(m_TashiRelayBaseUrl);
-                EditorGUILayout.PropertyField(m_TashiRelayApiKey);
+                m_ShowApiKey = EditorGUILayout.Toggle("Show API Key", m_ShowApiKey);
+                if (m_ShowApiKey)
+                {
+                    EditorGUILayout.PropertyField(m_TashiRelayApiKey, new GUIContent("API Key"));
+                }
+                else
+                {
+                    m_TashiRelayApiKey.stringValue = EditorGUILayout.PasswordField("API Key", m_TashiRelayApiKey.stringValue);
+                }
             }
 
             serializedObject.ApplyModifiedProperties();
