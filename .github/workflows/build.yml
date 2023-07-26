@@ -66,9 +66,12 @@ jobs:
         with:
           name: tnt
           path: ${{ env.TNT_ARCHIVE_NAME }}
+          if-no-files-found: error
 
       - name: Create the Examples archive
         run: |
+          rm -rf "package/Samples~"
+          mv package Examples/Packages/dev.tashi.network.transport
           mv Examples TashiNetworkTransport-Examples-${TNT_VERSION}
           zip -r TashiNetworkTransport-Examples-${TNT_VERSION}.zip TashiNetworkTransport-Examples-${TNT_VERSION}
 
@@ -76,7 +79,8 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: Examples Project
-          path: TashiNetworkTransport-Examples-${TNT_VERSION}.zip
+          path: TashiNetworkTransport-Examples-*.zip
+          if-no-files-found: error
 
       - name: Create a draft release
         if: inputs.release-version != ''
