@@ -71,7 +71,7 @@ jobs:
       - name: Create the Examples archive
         run: |
           rm -rf "package/Samples~"
-          mv package Examples/Packages/dev.tashi.network.transport
+          cp -r package Examples/Packages/dev.tashi.network.transport
           mv Examples TashiNetworkTransport-Examples-${TNT_VERSION}
           zip -r TashiNetworkTransport-Examples-${TNT_VERSION}.zip TashiNetworkTransport-Examples-${TNT_VERSION}
 
