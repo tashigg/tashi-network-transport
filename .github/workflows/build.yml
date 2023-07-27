@@ -92,3 +92,4 @@ jobs:
           artifacts: "*.tgz,*.zip"
           commit: main
           tag: v${{ inputs.release-version }}
+          updateOnlyUnreleased: true
