@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.1]
+## [0.3.2]
 
 ### Changed
 
@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Tashi Relay's API key is now masked in the inspector by default.
 * The default editor version for the Examples project is now 2022.3.5f1.
 * The Examples project asset now includes TNT.
+
+## 0.3.1
+
+This version was an internal release for our cloud services.
 
 ## [0.3.0]
 
@@ -71,6 +75,7 @@ but it enables people to start using TNT immediately.
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 [Discord]: https://discord.com/invite/fPNdgUCGnk
+[0.3.2]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.3.2
 [0.3.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.2.0
 [0.1.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.1.0
