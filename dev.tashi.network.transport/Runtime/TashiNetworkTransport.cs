@@ -441,7 +441,7 @@ namespace Tashi.NetworkTransport
         {
             Assert.IsNotNull(_platform);
 
-            if (!string.IsNullOrWhiteSpace(Config.TashiRelayApiKey))
+            if (Config.NetworkMode == TashiNetworkMode.TashiRelay)
             {
                 if (_state == State.WaitingForTashiRelay)
                 {
@@ -488,7 +488,7 @@ namespace Tashi.NetworkTransport
         {
             Assert.IsNotNull(_platform);
 
-            if (!string.IsNullOrWhiteSpace(Config.TashiRelayApiKey))
+            if (Config.NetworkMode == TashiNetworkMode.TashiRelay)
             {
                 if (tashiRelay is not null)
                 {
