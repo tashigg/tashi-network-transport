@@ -10,11 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Significant performance improvements in terms of CPU, memory and lower
-  latency.
+  latency. You can now increase your sync interval while still getting better
+  results. Keeping the sync interval as it was will increase CPU usage.
 * The default Tashi Relay URL now points to our East US service.
 * Tashi Relay's API key is now masked in the inspector by default.
 * The default editor version for the Examples project is now 2022.3.5f1.
 * The Examples project asset now includes TNT.
+
+### Fixed
+
+* Setting a Tashi Relay API key and then switching the network mode to something
+  would continue to use Tashi Relay mode.
+* Remove an unnecessary use of `Unity.Random`. This was causing build issues in
+  some environments.
+
+### Known issues
+
+* When players quit the game session ends. This will be fixed in an upcoming
+  release. This isn't a regression.
 
 ## 0.3.1
 
