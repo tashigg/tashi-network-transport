@@ -67,15 +67,15 @@ namespace Tashi.ConsensusEngine
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private unsafe delegate void LogDelegate(byte* utf8String, UIntPtr len);
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_log_set_functions", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_log_set_functions", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_log_set_functions
         (
             LogDelegate? log,
             LogDelegate? logWarning,
             LogDelegate? logError
         );
-        
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_log_set_filter", CallingConvention = CallingConvention.Cdecl)]
+
+        [DllImport("tce_ffi", EntryPoint = "tce_log_set_filter", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_log_set_filter
         (
             [MarshalAs(UnmanagedType.LPUTF8Str)] string logFilter
