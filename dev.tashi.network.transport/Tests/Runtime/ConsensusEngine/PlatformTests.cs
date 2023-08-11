@@ -20,7 +20,7 @@ namespace TashiConsensusEngineTests
             var secretKey = SecretKey.Generate();
             var endPoint = new IPEndPoint(IPAddress.Any, 0);
             _publicKey = secretKey.PublicKey;
-            _platform = new Platform(mode, endPoint, TimeSpan.FromMilliseconds(33), secretKey);
+            _platform = new Platform(mode, endPoint, 1500, secretKey);
             Console.WriteLine($"Bound to {_platform.GetBoundAddress()}");
         }
 
@@ -125,7 +125,7 @@ namespace TashiConsensusEngineTests
         {
             var secretKey = SecretKey.Generate();
             var endPoint = new IPEndPoint(IPAddress.Any, 0);
-            using var platform = new Platform(NetworkMode.Loopback, endPoint, TimeSpan.FromMilliseconds(33), secretKey);
+            using var platform = new Platform(NetworkMode.Loopback, endPoint, 1500, secretKey);
             var addressBook = new AddressBookEntry[]
             {
                 new DirectAddressBookEntry(platform.GetBoundAddress(), secretKey.PublicKey)

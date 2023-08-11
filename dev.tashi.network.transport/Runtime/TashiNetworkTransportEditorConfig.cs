@@ -10,8 +10,9 @@ namespace Tashi.NetworkTransport
         [Tooltip("The local port to listen on. Use 0 to have one assigned for you.")] [SerializeField]
         public ushort BindPort;
 
-        [Tooltip("How often syncs should be sent to other nodes.")]
-        public uint SyncInterval = 33;
+        // TODO: Include a link to good documentation
+        [Tooltip("How often events should be created. This is multiplied by the session size and dynamically adjusts depending on network conditions.")]
+        public UInt64 MinBaseEventIntervalMicros = 1500;
 
         [Tooltip("Which network mode to run TNT in")]
         public TashiNetworkMode NetworkMode = TashiNetworkMode.TashiRelay;
