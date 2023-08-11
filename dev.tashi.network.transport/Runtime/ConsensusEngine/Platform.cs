@@ -42,10 +42,10 @@ namespace Tashi.ConsensusEngine
                 NativeLogger.Init();
 
                 var logFilter = NetworkManager.Singleton.LogLevel switch {
-                    LogLevel.Developer => "tashi_consensus_engine=debug,tashi_address_book=debug",
-                    LogLevel.Normal => "tashi_consensus_engine=info",
-                    LogLevel.Error => "tashi_consensus_engine=error",
-                    _ => "tashi_consensus_engine=off",
+                    LogLevel.Developer => "tce_ffi=debug,tashi_address_book=debug",
+                    LogLevel.Normal => "tce_ffi=info",
+                    LogLevel.Error => "tce_ffi=error",
+                    _ => "tce_ffi=off",
                 };
 
                 // The ordering of these two doesn't particularly matter.
@@ -379,7 +379,7 @@ namespace Tashi.ConsensusEngine
             Dispose(false);
         }
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_init", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_init", CallingConvention = CallingConvention.Cdecl)]
         static extern IntPtr tce_init(
             NetworkMode mode,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string? address,
@@ -390,7 +390,7 @@ namespace Tashi.ConsensusEngine
             out Result result
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_bound_address_get",
+        [DllImport("tce_ffi", EntryPoint = "tce_bound_address_get",
             CallingConvention = CallingConvention.Cdecl)]
         static extern Int32 tce_bound_address_get(
             IntPtr platform,
@@ -399,7 +399,7 @@ namespace Tashi.ConsensusEngine
             out UInt16 port
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_add_node", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_add_node", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_add_node(
             IntPtr platform,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string address,
@@ -408,23 +408,23 @@ namespace Tashi.ConsensusEngine
             bool isRelay
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_start", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_start", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_start(IntPtr platform);
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_event_get", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_event_get", CallingConvention = CallingConvention.Cdecl)]
         static extern IntPtr tce_event_get(
             IntPtr platform,
             out Result result
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_send", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_send", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_send(
             IntPtr platform,
             byte[] data,
             UInt32 len
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get",
+        [DllImport("tce_ffi", EntryPoint = "tce_external_transmit_get",
             CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_transmit_get(
             IntPtr platform,
@@ -433,7 +433,7 @@ namespace Tashi.ConsensusEngine
 
         // other tce_external_transmit bindings are in `ExternalConnectionManager.cs`
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_prepare",
+        [DllImport("tce_ffi", EntryPoint = "tce_external_recv_prepare",
             CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_recv_prepare(
             IntPtr platform,
@@ -442,7 +442,7 @@ namespace Tashi.ConsensusEngine
             out UInt64 len
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_recv_commit",
+        [DllImport("tce_ffi", EntryPoint = "tce_external_recv_commit",
             CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_recv_commit(
             IntPtr platform,
@@ -452,14 +452,14 @@ namespace Tashi.ConsensusEngine
             UInt32 sockAddrLen
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_event_free",
+        [DllImport("tce_ffi", EntryPoint = "tce_event_free",
             CallingConvention = CallingConvention.Cdecl)]
         static extern void tce_event_free(IntPtr consensusEvent);
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_free", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_free", CallingConvention = CallingConvention.Cdecl)]
         static extern void tce_free(IntPtr platform);
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_relay_create_session",
+        [DllImport("tce_ffi", EntryPoint = "tce_relay_create_session",
             CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_relay_create_session(
             IntPtr platform,

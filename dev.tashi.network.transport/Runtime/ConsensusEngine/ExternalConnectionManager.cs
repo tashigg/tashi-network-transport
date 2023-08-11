@@ -391,20 +391,20 @@ namespace Tashi.ConsensusEngine
             }
         }
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_addr", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_external_transmit_get_addr", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_transmit_get_addr(
             IntPtr transmit,
             out SockAddr addr
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_get_packet", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_external_transmit_get_packet", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_transmit_get_packet(
             IntPtr transmit,
             out IntPtr packetOut,
             out UInt64 packetLenOut
         );
 
-        [DllImport("tashi_consensus_engine", EntryPoint = "tce_external_transmit_destroy", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tce_ffi", EntryPoint = "tce_external_transmit_destroy", CallingConvention = CallingConvention.Cdecl)]
         static extern Result tce_external_transmit_destroy(IntPtr transmit);
     }
 }
