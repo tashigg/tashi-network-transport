@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0]
+
+### Changed
+
+* `Platform`'s constructor no longer takes a `syncInterval`, it instead takes
+  `baseMinEventIntervalMicros`. This will be described in detail in the docs.
+  A reasonable default value to start with is 1,500 microseconds. This breaking
+  change is requireddue to a fundamental difference in how the consensus engine
+  decides to synchronize between nodes within the network.
+* Performance has been improved under heavy load.
+
+### Fixed
+
+* `com.unity.services.lobby` has now been included in `packages-lock.json`.
+
 ## [0.3.2]
 
 ### Changed
