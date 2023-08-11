@@ -13,7 +13,7 @@ namespace Tashi.NetworkTransport
         {
             var secretKey = ConsensusEngine.SecretKey.Generate();
             var endPoint = new IPEndPoint(IPAddress.Any, 0);
-            var platform = new ConsensusEngine.Platform(NetworkMode.Loopback, endPoint, TimeSpan.FromMilliseconds(10), secretKey);
+            var platform = new ConsensusEngine.Platform(NetworkMode.Loopback, endPoint, 1500, secretKey);
 
             var addressBook = new AddressBookEntry[]
             {

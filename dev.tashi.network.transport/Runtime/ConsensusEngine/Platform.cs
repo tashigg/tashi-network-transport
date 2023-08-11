@@ -63,8 +63,7 @@ namespace Tashi.ConsensusEngine
         /// Create a new platform. It won't begin communicating with other nodes
         /// until the Start method is called.
         /// </summary>
-        ///
-        public Platform(NetworkMode mode, IPEndPoint bindEndPoint, TimeSpan syncInterval, SecretKey secretKey)
+        public Platform(NetworkMode mode, IPEndPoint bindEndPoint, UInt64 baseMinEventIntervalMicros, SecretKey secretKey)
         {
             _clientId = secretKey.PublicKey.ClientId;
 
@@ -72,8 +71,7 @@ namespace Tashi.ConsensusEngine
                 mode,
                 bindEndPoint.Address.ToString(),
                 (ushort)bindEndPoint.Port,
-                // FIXME: Ensure the conversion can succeed
-                (UInt32)syncInterval.TotalMilliseconds,
+                baseMinEventIntervalMicros,
                 secretKey.Der,
                 (uint)secretKey.Der.Length,
                 out var result
@@ -384,7 +382,7 @@ namespace Tashi.ConsensusEngine
             NetworkMode mode,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string? address,
             UInt16 port,
-            UInt32 syncIntervalMilliseconds,
+            UInt64 baseMinEventIntervalMicros,
             byte[] publicKeyDer,
             UInt32 publicKeyDerLen,
             out Result result

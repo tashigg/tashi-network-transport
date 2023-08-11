@@ -267,7 +267,7 @@ namespace Tashi.NetworkTransport
             _platform = new Platform(
                 Config.NetworkMode.ToTceNetworkMode(),
                 bindEndPoint,
-                TimeSpan.FromMilliseconds(Config.SyncInterval),
+                Config.MinBaseEventIntervalMicros,
                 _secretKey
             );
 
