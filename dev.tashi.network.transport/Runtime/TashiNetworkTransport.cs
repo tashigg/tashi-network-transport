@@ -65,6 +65,11 @@ namespace Tashi.NetworkTransport
             _clientId = publicKey.ClientId;
         }
 
+        private void Awake()
+        {
+            NativeAddressFamily.InitializeStatics(SystemInfo.operatingSystemFamily);
+        }
+
         // Network transport events must be in terms of seconds since the game
         // started, but the Tashi Platform reports times as unix timestamp in
         // nanoseconds.
