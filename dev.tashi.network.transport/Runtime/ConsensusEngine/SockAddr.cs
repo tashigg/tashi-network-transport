@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -18,11 +19,6 @@ namespace Tashi.ConsensusEngine
 
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = DataLen)]
         private byte[] _data;
-
-        public SockAddr(IPEndPoint ipEndPoint) : this()
-        {
-            IPEndPoint = ipEndPoint;
-        }
 
         // C#'s AddressFamily doesn't match up to the native `AF_*` values and
         // it's 4 bytes instead of 2.
@@ -212,6 +208,8 @@ namespace Tashi.ConsensusEngine
     /// </summary>
     internal class NativeAddressFamily
     {
+        private static OperatingSystemFamily _operatingSystemFamily;
+        
         /// <summary>
         /// Corresponds to AF_INET
         /// </summary>
@@ -237,7 +235,7 @@ namespace Tashi.ConsensusEngine
                 //
                 // There's more convenient getters in newer .NET versions but that of course doesn't help us here:
                 // https://learn.microsoft.com/en-us/dotnet/api/system.operatingsystem.iswindows
-                return SystemInfo.operatingSystemFamily switch
+                return _operatingSystemFamily switch
                 {
                     OperatingSystemFamily.Windows => 23,
                     OperatingSystemFamily.Linux => 10,
@@ -245,6 +243,17 @@ namespace Tashi.ConsensusEngine
                     _ => throw new Exception("unsupported operating system")
                 };
             }
+        }
+
+        /// <summary>
+        /// This struct's methods support being called from any thread, but it
+        /// must use functions that are only callable from the main thread and
+        /// are lazily initialized. This must be called from the main thread
+        /// to initialize those statics.
+        /// </summary>
+        public static void InitializeStatics(OperatingSystemFamily operatingSystemFamily)
+        {
+            _operatingSystemFamily = operatingSystemFamily;
         }
 
         public static AddressFamily ToAddressFamily(UInt16 nativeAddressFamily)
