@@ -42,9 +42,9 @@ namespace Tashi.ConsensusEngine
                 NativeLogger.Init();
 
                 var logFilter = NetworkManager.Singleton.LogLevel switch {
-                    LogLevel.Developer => "tce_ffi=debug,tashi_address_book=debug",
-                    LogLevel.Normal => "tce_ffi=info",
-                    LogLevel.Error => "tce_ffi=error",
+                    LogLevel.Developer => "tce_ffi=debug,tashi_address_book=debug,tashi_consensus_engine=debug",
+                    LogLevel.Normal => "tce_ffi=info,tashi_consensus_engine=info",
+                    LogLevel.Error => "tce_ffi=error,tashi_consensus_engine=error",
                     _ => "tce_ffi=off",
                 };
 
