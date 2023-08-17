@@ -6,6 +6,8 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Assertions;
+using System.Runtime.CompilerServices;
 
 namespace Tashi.ConsensusEngine
 {
@@ -15,7 +17,8 @@ namespace Tashi.ConsensusEngine
         // Total struct size is 128 bytes, minus 2 bytes for AddressFamily
         private const int DataLen = 126;
 
-        [MarshalAs(UnmanagedType.U2)] private UInt16 _addressFamily;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        private byte[] _addressFamily;
 
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = DataLen)]
         private byte[] _data;
@@ -66,7 +69,7 @@ namespace Tashi.ConsensusEngine
         {
             get
             {
-                if (_addressFamily != NativeAddressFamily.InterNetworkV6) return false;
+                if (NativeAddressFamily.ToAddressFamily(_addressFamily) != AddressFamily.InterNetworkV6) return false;
 
                 return
                     BinaryPrimitives.ReadUInt16BigEndian(PortSpan) == ClientIdPort &&
@@ -102,7 +105,7 @@ namespace Tashi.ConsensusEngine
         {
             SockAddr addrOut = new SockAddr
             {
-                _addressFamily = NativeAddressFamily.InterNetworkV6,
+                _addressFamily = NativeAddressFamily.FromAddressFamily(AddressFamily.InterNetworkV6),
                 _data = new byte[DataLen]
             };
 
@@ -142,9 +145,12 @@ namespace Tashi.ConsensusEngine
 
             var sockAddrOut = new SockAddr();
             sockAddrOut._data = new byte[126];
+            sockAddrOut._addressFamily = new byte[2];
 
-            // This is one place we actually do want to use native endianness, as that's how it's specified.
-            sockAddrOut._addressFamily = (ushort)Marshal.ReadInt16(sockAddr);
+            // macOS and some other BSDs use the first byte to represent `ss_len`,
+            // but others use the address family field as 2 bytes. Some BSDs
+            // even got rid of `ss_len`.
+            Marshal.Copy(sockAddr, sockAddrOut._addressFamily, 0, 2);
             
             // Offset to the actual data.
             var sockAddrData = sockAddr + 2;
@@ -184,14 +190,17 @@ namespace Tashi.ConsensusEngine
 
         public bool Equals(SockAddr other)
         {
-            return _addressFamily == other._addressFamily && _data.SequenceEqual(other._data);
+            return _addressFamily.SequenceEqual(other._addressFamily) && _data.SequenceEqual(other._data);
         }
 
         public override int GetHashCode()
         {
             var hasher = new HashCode();
 
-            hasher.Add(_addressFamily);
+            foreach (var b in _addressFamily)
+            {
+                hasher.Add(b);
+            }
 
             // `hashCode.AddBytes` is unavailable
             foreach (var b in _data)
@@ -213,12 +222,12 @@ namespace Tashi.ConsensusEngine
         /// <summary>
         /// Corresponds to AF_INET
         /// </summary>
-        public const UInt16 InterNetwork = 2;
+        private const UInt16 InterNetwork = 2;
 
         /// <summary>
         /// Corresponds to AF_INET6
         /// </summary>
-        public static UInt16 InterNetworkV6
+        private static UInt16 InterNetworkV6
         {
             get
             {
@@ -256,30 +265,47 @@ namespace Tashi.ConsensusEngine
             _operatingSystemFamily = operatingSystemFamily;
         }
 
-        public static AddressFamily ToAddressFamily(UInt16 nativeAddressFamily)
+        public static AddressFamily ToAddressFamily(byte[] nativeAddressFamilyBytes)
         {
+            Assert.AreEqual(nativeAddressFamilyBytes.Length, 2);
+
+            UInt16 value = _operatingSystemFamily switch
+            {
+                OperatingSystemFamily.MacOSX => nativeAddressFamilyBytes[1],
+                _ => BitConverter.ToUInt16(nativeAddressFamilyBytes),
+            };
+            
             // Can't use `switch()` here because `InterNetwork6` isn't a constant.
-            if (nativeAddressFamily == InterNetwork)
+            if (value == InterNetwork)
             {
                 return AddressFamily.InterNetwork;
             }
 
-            if (nativeAddressFamily == InterNetworkV6)
+            if (value == InterNetworkV6)
             {
                 return AddressFamily.InterNetworkV6;
             }
 
-            throw new ArgumentException($"unknown AddressFamily value: {nativeAddressFamily}");
+            throw new ArgumentException($"unknown AddressFamily value: {value}");
         }
 
-        public static UInt16 FromAddressFamily(AddressFamily addressFamily)
+        public static byte[] FromAddressFamily(AddressFamily addressFamily)
         {
-            return addressFamily switch
+            var nativeAddressFamily = addressFamily switch
             {
                 AddressFamily.InterNetwork => InterNetwork,
                 AddressFamily.InterNetworkV6 => InterNetworkV6,
                 _ => throw new ArgumentException($"unsupported AddressFamily type: {addressFamily}")
             };
+
+            if (_operatingSystemFamily == OperatingSystemFamily.MacOSX)
+            {
+                return new byte[] { 0, (byte)nativeAddressFamily };
+            }
+            else
+            {
+                return BitConverter.GetBytes(nativeAddressFamily);
+            }
         }
     }
 }

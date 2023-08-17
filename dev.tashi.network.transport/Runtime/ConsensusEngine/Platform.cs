@@ -12,7 +12,7 @@ using UnityEngine;
 
 namespace Tashi.ConsensusEngine
 {
-    // NOTE: this should match `TceNetworkMode` in TCE or things will get weird.
+    // NOTE: this must match `TceNetworkMode` in TCE or things will get weird.
     public enum NetworkMode
     {
         Loopback,
