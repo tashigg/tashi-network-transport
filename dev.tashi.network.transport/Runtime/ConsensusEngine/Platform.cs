@@ -23,7 +23,7 @@ namespace Tashi.ConsensusEngine
     /// <summary>
     /// The Tashi Platform.
     /// </summary>
-    public class Platform : IDisposable
+    public sealed class Platform : IDisposable
     {
         private IntPtr _platform;
         private bool _started;
@@ -347,7 +347,7 @@ namespace Tashi.ConsensusEngine
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (_disposed)
             {

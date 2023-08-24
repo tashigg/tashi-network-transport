@@ -14,7 +14,7 @@ using UnityEngine.Assertions;
 namespace Tashi.NetworkTransport
 {
     [AddComponentMenu("Netcode/Tashi Network Transport")]
-    public class TashiNetworkTransport : Unity.Netcode.NetworkTransport
+    public sealed class TashiNetworkTransport : Unity.Netcode.NetworkTransport
     {
         public override ulong ServerClientId { get; }
 
