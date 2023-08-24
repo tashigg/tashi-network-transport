@@ -3,11 +3,9 @@ using System.Buffers.Binary;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Assertions;
-using System.Runtime.CompilerServices;
 
 namespace Tashi.ConsensusEngine
 {

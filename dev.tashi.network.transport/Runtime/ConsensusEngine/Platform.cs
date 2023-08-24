@@ -29,8 +29,6 @@ namespace Tashi.ConsensusEngine
         private bool _started;
         private bool _disposed;
 
-        private ulong _clientId;
-
         // Unity Relay enforces a limit of 1400 bytes per each datagram.
         private static readonly UInt64 MaxRelayDataLen = 1400;
 
@@ -65,8 +63,6 @@ namespace Tashi.ConsensusEngine
         /// </summary>
         public Platform(NetworkMode mode, IPEndPoint bindEndPoint, UInt64 baseMinEventIntervalMicros, SecretKey secretKey)
         {
-            _clientId = secretKey.PublicKey.ClientId;
-
             _platform = tce_init(
                 mode,
                 bindEndPoint.Address.ToString(),
