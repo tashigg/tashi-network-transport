@@ -360,7 +360,7 @@ namespace Tashi.NetworkTransport
         {
             if (sessionDetails.AddressBook.Count > MaximumSessionSize)
             {
-                throw new Exception($"The maximum supported session size is {MaximumSessionSize}");
+                throw new InvalidOperationException($"The maximum supported session size is {MaximumSessionSize}");
             }
 
             Debug.Log($"Applying incoming session data with {sessionDetails.AddressBook.Count} entries");

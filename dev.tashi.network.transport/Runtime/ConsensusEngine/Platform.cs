@@ -39,7 +39,8 @@ namespace Tashi.ConsensusEngine
             {
                 NativeLogger.Init();
 
-                var logFilter = NetworkManager.Singleton.LogLevel switch {
+                var logFilter = NetworkManager.Singleton.LogLevel switch
+                {
                     LogLevel.Developer => "tce_ffi=debug,tashi_address_book=debug,tashi_consensus_engine=debug",
                     LogLevel.Normal => "tce_ffi=info,tashi_consensus_engine=info",
                     LogLevel.Error => "tce_ffi=error,tashi_consensus_engine=error",
@@ -73,10 +74,7 @@ namespace Tashi.ConsensusEngine
                 out var result
             );
 
-            if (result != Result.Success)
-            {
-                throw new ArgumentException($"Failed to initialize the platform: {result}");
-            }
+            result.SuccessOrThrow("tce_init");
         }
 
         /// <summary>
@@ -96,7 +94,7 @@ namespace Tashi.ConsensusEngine
                 buffer.Capacity = requiredSize;
                 if (requiredSize != tce_bound_address_get(_platform, buffer, buffer.Capacity, out port))
                 {
-                    throw new Exception($"Failed to get the bound address: {requiredSize}");
+                    throw new SystemException($"Failed to get the bound address: {requiredSize}");
                 }
             }
 
@@ -129,21 +127,17 @@ namespace Tashi.ConsensusEngine
                 }
                 else
                 {
-                    throw new Exception($"unsupported AddressBookEntry type: {entry}");
+                    throw new ArgumentException($"Unsupported AddressBookEntry type: {entry}");
                 }
 
-                var result = tce_add_node(
+                tce_add_node(
                     _platform,
                     address,
                     entry.PublicKey.Der,
                     (uint)entry.PublicKey.Der.Length,
                     entry.IsRelay
-                );
-
-                if (result != Result.Success)
-                {
-                    throw new ArgumentException($"Failed to add address book entry for {entry}: {result}");
-                }
+                )
+                .SuccessOrThrow("tce_add_node");
             }
         }
 
@@ -154,17 +148,10 @@ namespace Tashi.ConsensusEngine
                 throw new InvalidOperationException("The platform has already been started");
             }
 
-            var result = tce_start(_platform);
-            switch (result)
-            {
-                case Result.Success:
-                    _started = true;
-                    break;
-                case Result.EmptyAddressBook:
-                    throw new InvalidOperationException("The address book hasn't been set");
-                default:
-                    throw new InvalidOperationException($"Failed to start the platform: {result}");
-            }
+            tce_start(_platform)
+                .SuccessOrThrow("tce_start");
+
+            _started = true;
         }
 
         public void Start(IList<AddressBookEntry> entries)
@@ -191,10 +178,7 @@ namespace Tashi.ConsensusEngine
             }
 
             var ptr = tce_event_get(_platform, out var result);
-            if (result != Result.Success)
-            {
-                throw new SystemException($"Failed to get a consensus event: {result}");
-            }
+            result.SuccessOrThrow("tce_get_event");
 
             if (ptr == IntPtr.Zero)
             {
@@ -208,11 +192,8 @@ namespace Tashi.ConsensusEngine
 
         public void Send(byte[] data)
         {
-            var result = tce_send(_platform, data, (UInt32)data.Length);
-            if (result != Result.Success)
-            {
-                throw new SystemException($"Failed to send the data: {result}");
-            }
+            tce_send(_platform, data, (UInt32)data.Length)
+                .SuccessOrThrow("tce_send");
         }
 
         internal ExternalTransmit? GetExternalTransmit()
@@ -285,17 +266,17 @@ namespace Tashi.ConsensusEngine
         {
             if (relayApiKey.Length == 0)
             {
-                throw new ArgumentException("relayApiKey is empty");
+                throw new ArgumentException("The Tashi Relay API key hasn't been set");
             }
 
             if (_sessionResultDelegate != null)
             {
-                throw new InvalidOperationException("CreateRelaySession call already in-flight");
+                throw new InvalidOperationException("A Tashi Relay session allocation is already in progress");
             }
 
             if (_started)
             {
-                throw new InvalidOperationException("Platform already started");
+                throw new InvalidOperationException("A Tashi Relay session has already been created");
             }
 
             var syncContext = SynchronizationContext.Current;
@@ -303,7 +284,7 @@ namespace Tashi.ConsensusEngine
             // We need to retain this instance until the call completes or the platform instance is destroyed
             // so it doesn't get garbage collected while the async call is still running.
             //
-            // If we get random segfaults after calling this method, then this is likely a faulty approach. 
+            // If we get random segfaults after calling this method, then this is likely a faulty approach.
             _sessionResultDelegate =
                 (result, relayPublicKeyDer, relayPublicKeyDerLen, relaySockAddr, relaySockAddrLen) =>
                 {
