@@ -9,12 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* `Platform`'s constructor no longer takes a `syncInterval`, it instead takes
-  `baseMinEventIntervalMicros`. This will be described in detail in the docs.
-  A reasonable default value to start with is 1,500 microseconds. This breaking
-  change is requireddue to a fundamental difference in how the consensus engine
-  decides to synchronize between nodes within the network.
 * Performance has been improved under heavy load.
+
+#### `TashiNetworkTransport` class changes
+* `UpdateSessionDetails` has been renamed to `StartSession` and its
+  documentation has been updated.
+* `OnPlatformInit` has been removed, it shouldn't be necessary for users to know
+  when the lower level `Platform` has been initialized.
+* `SessionHasStarted` has been removed in favour of `SessionState`.
+
+#### `Platform` class changes
+
+`Platform`'s constructor no longer takes a `syncInterval`, it instead takes
+`baseMinEventIntervalMicros`. This will be described in detail in the docs.
+A reasonable default value to start with is 1,500 microseconds. This breaking
+change is required due to a fundamental difference in how the consensus engine
+decides to synchronize between nodes within the network.
 
 ### Fixed
 
@@ -103,6 +113,7 @@ but it enables people to start using TNT immediately.
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: https://semver.org/spec/v2.0.0.html
 [Discord]: https://discord.com/invite/fPNdgUCGnk
+[0.4.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.4.0
 [0.3.2]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.3.2
 [0.3.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.3.0
 [0.2.0]: https://github.com/tashigg/tashi-network-transport/releases/tag/v0.2.0
