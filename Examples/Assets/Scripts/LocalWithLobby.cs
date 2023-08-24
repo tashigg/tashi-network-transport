@@ -160,7 +160,7 @@ public class LocalWithLobby : MonoBehaviour
                 }
             }
 
-            if (!NetworkTransport.SessionHasStarted)
+            if (NetworkTransport.SessionState == SessionState.NotStarted)
             {
                 var lobby = await LobbyService.Instance.GetLobbyAsync(_lobbyId);
                 var incomingSessionDetails = IncomingSessionDetails.FromUnityLobby(lobby);
@@ -168,7 +168,16 @@ public class LocalWithLobby : MonoBehaviour
                 // This should be replaced with whatever logic you use to determine when a lobby is locked in.
                 if (incomingSessionDetails.AddressBook.Count == 2)
                 {
-                    NetworkTransport.UpdateSessionDetails(incomingSessionDetails);
+                    NetworkTransport.StartSession(incomingSessionDetails,
+                        () =>
+                        {
+                            Debug.Log("StartSession succeeded");
+                        },
+                        () =>
+                        {
+                            Debug.Log("StartSession failed");
+                        }
+                    );
                 }
             }
         }
