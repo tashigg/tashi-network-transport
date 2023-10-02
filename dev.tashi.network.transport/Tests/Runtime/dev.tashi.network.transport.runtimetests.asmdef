@@ -1,9 +1,0 @@
-{
-  "name": "dev.tashi.network.transport.runtimetests",
-  "references": [
-    "dev.tashi.network.transport"
-  ],
-  "optionalUnityReferences": [
-    "TestAssemblies"
-  ]
-}

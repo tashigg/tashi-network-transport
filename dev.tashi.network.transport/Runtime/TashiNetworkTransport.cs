@@ -13,8 +13,28 @@ using UnityEngine.Assertions;
 
 namespace Tashi.NetworkTransport
 {
+    public enum SessionState
+    {
+        /// <summary>
+        /// `StartSession` has not been called, or the existing session
+        /// failed or concluded.
+        /// </summary>
+        NotStarted,
+
+        /// <summary>
+        /// `StartSession` has been called and the session is being set up.
+        /// This can take some time if a relay needs to be allocated.
+        /// </summary>
+        Starting,
+
+        /// <summary>
+        /// The session was completely started and is in progress.
+        /// </summary>
+        InProgress,
+    }
+
     [AddComponentMenu("Netcode/Tashi Network Transport")]
-    public class TashiNetworkTransport : Unity.Netcode.NetworkTransport
+    public sealed class TashiNetworkTransport : Unity.Netcode.NetworkTransport
     {
         public override ulong ServerClientId { get; }
 
@@ -24,23 +44,12 @@ namespace Tashi.NetworkTransport
         /// </summary>
         public TashiNetworkTransportEditorConfig Config = new();
 
-        /// <summary>
-        /// Determines whether the session state is <c>Running</c>. This is intended to help determine when the lobby
-        /// should be left or closed for games that don't allow new players to join after it has started.
-        /// </summary>
-        public bool SessionHasStarted => _state == State.Running;
+        public SessionState SessionState { get; private set; }
 
         /// <summary>
         /// Session details that should be shared with other players.
         /// </summary>
         public OutgoingSessionDetails OutgoingSessionDetails { get; private set; }
-
-        public delegate void OnPlatformInitHandler(object sender);
-
-        /// <summary>
-        /// A delegate that will be called once the Tashi Consensus Engine has successfully initialized.
-        /// </summary>
-        public OnPlatformInitHandler? OnPlatformInit;
 
         private const ushort MaximumSessionSize = 8;
         private Platform? _platform;
@@ -57,17 +66,39 @@ namespace Tashi.NetworkTransport
 
         private ExternalConnectionManager? _externalConnectionManager;
 
-        TashiNetworkTransport()
+        private TashiNetworkTransport()
         {
+            ConsensusEngine.Logger.Init(
+                log: (message) => Debug.Log(message),
+                logWarning: (message) => Debug.LogWarning(message),
+                logError: (message) => Debug.LogError(message)
+            );
+
             OutgoingSessionDetails = new OutgoingSessionDetails();
             _secretKey = SecretKey.Generate();
             PublicKey publicKey = _secretKey.PublicKey;
             _clientId = publicKey.ClientId;
         }
 
-        private void Awake()
+        private void Update()
         {
-            NativeAddressFamily.InitializeStatics(SystemInfo.operatingSystemFamily);
+            if (_beginSessionSucceeded != null)
+            {
+                if (_beginSessionSucceeded == true)
+                {
+                    _beginSessionSucceededHandler?.Invoke();
+                }
+                else
+                {
+                    _beginSessionFailedHandler?.Invoke();
+                }
+
+                _beginSessionSucceededHandler = null;
+                _beginSessionFailedHandler = null;
+                _beginSessionSucceeded = null;
+            }
+
+            _externalConnectionManager?.Update();
         }
 
         // Network transport events must be in terms of seconds since the game
@@ -126,7 +157,7 @@ namespace Tashi.NetworkTransport
                 return false;
             }
 
-            var creatorId =dataEvent.CreatorPublicKey.ClientId;
+            var creatorId = dataEvent.CreatorPublicKey.ClientId;
             if (creatorId == _clientId)
             {
                 Debug.Log("Ignoring a message that was created by me");
@@ -217,31 +248,21 @@ namespace Tashi.NetworkTransport
             payload = default;
             receiveTime = Time.realtimeSinceStartup;
 
-            if (!SessionHasStarted)
+            if (SessionState != SessionState.InProgress)
             {
                 return NetworkEvent.Nothing;
             }
-            
+
             while (ProcessEvent())
             {
             }
-            
+
             return NetworkEvent.Nothing;
         }
 
-        private enum State
-        {
-            WaitingForSessionDetails,
-            WaitingForTashiRelay,
-            Running,
-        }
-
-        private State _state = State.WaitingForSessionDetails;
-
-        private void Update()
-        {
-            _externalConnectionManager?.Update();
-        }
+        private Action? _beginSessionSucceededHandler;
+        private Action? _beginSessionFailedHandler;
+        private bool? _beginSessionSucceeded;
 
         public override bool StartClient()
         {
@@ -269,6 +290,24 @@ namespace Tashi.NetworkTransport
                 ? _secretKey.PublicKey.SyntheticEndpoint
                 : new IPEndPoint(IPAddress.Any, Config.BindPort);
 
+            var logFilter = NetworkManager.Singleton.LogLevel switch
+            {
+                LogLevel.Developer => "tce_ffi=debug,tashi_address_book=debug,tashi_consensus_engine=debug",
+                LogLevel.Normal => "tce_ffi=info,tashi_consensus_engine=info",
+                LogLevel.Error => "tce_ffi=error,tashi_consensus_engine=error",
+                _ => "tce_ffi=off",
+            };
+
+            try
+            {
+                ConsensusEngine.Logger.SetFilter(logFilter);
+                Debug.Log("Logging initialized");
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+
             _platform = new Platform(
                 Config.NetworkMode.ToTceNetworkMode(),
                 bindEndPoint,
@@ -279,9 +318,9 @@ namespace Tashi.NetworkTransport
             if (Config.NetworkMode == TashiNetworkMode.UnityRelay)
             {
                 Debug.Log("binding in external mode");
-                
+
                 var externalManager = _externalConnectionManager = new ExternalConnectionManager(_platform, MaximumSessionSize, _secretKey.PublicKey.ClientId);
-                
+
                 // C#'s task system is markedly different from Rust's: in Rust, the consumer of a `Future`
                 // is responsible for driving it forward unless explicitly spawned into a runtime,
                 // whereas C# is closer to Javascript's Promise system where tasks dependent on the completion of a
@@ -322,7 +361,6 @@ namespace Tashi.NetworkTransport
         {
             OutgoingSessionDetails.AddressBookEntry = addressBookEntry;
             AddAddressBookEntry(addressBookEntry, _isServer);
-            OnPlatformInit?.Invoke(this);
         }
 
         public override void DisconnectRemoteClient(ulong clientId)
@@ -347,7 +385,7 @@ namespace Tashi.NetworkTransport
         {
             Debug.Log("TNT Shutdown");
             _platform?.Dispose();
-            _state = State.WaitingForSessionDetails;
+            SessionState = SessionState.NotStarted;
             _externalConnectionManager?.Dispose();
         }
 
@@ -356,14 +394,49 @@ namespace Tashi.NetworkTransport
             Debug.Log("TNT Initialize");
         }
 
-        public void UpdateSessionDetails(IncomingSessionDetails sessionDetails)
+        /// <summary>
+        /// <para>Attempts to start the session.</para>
+        ///
+        /// <para>Hosts</para>
+        ///
+        /// <para>
+        /// This should only be called once by hosts. If a Tashi Relay is going
+        /// to be used then this will create a thread to handle the allocation.
+        /// Once the relay is allocated its details will be available in
+        /// <see cref="OutgoingSessionDetails"/>, which should be shared with the rest of
+        /// the lobby.
+        /// </para>
+        ///
+        /// <para>Clients</para>
+        ///
+        /// <para>
+        /// This should only be called once by clients. If a Tashi Relay is
+        /// going to be used then you should check that
+        /// <see cref="IncomingSessionDetails.TashiRelay"/> is set so that you
+        /// know the host has successfully allocated the relay.
+        /// </para>
+        /// </summary>
+        /// <param name="sessionDetails"></param>
+        /// <param name="onSuccess"></param>
+        /// <param name="onError"></param>
+        /// <exception cref="InvalidOperationException">If the session detail's
+        /// address book contains too many entries.</exception>
+        public void StartSession(
+            IncomingSessionDetails sessionDetails,
+            Action? onSuccess,
+            Action? onError
+        )
         {
+            Assert.AreEqual(SessionState.NotStarted, SessionState);
+
             if (sessionDetails.AddressBook.Count > MaximumSessionSize)
             {
-                throw new Exception($"The maximum supported session size is {MaximumSessionSize}");
+                throw new InvalidOperationException($"The maximum supported session size is {MaximumSessionSize}");
             }
 
-            Debug.Log($"Applying incoming session data with {sessionDetails.AddressBook.Count} entries");
+            _beginSessionSucceededHandler = onSuccess;
+            _beginSessionFailedHandler = onError;
+            _beginSessionSucceeded = null;
 
             foreach (var entry in sessionDetails.AddressBook)
             {
@@ -446,19 +519,14 @@ namespace Tashi.NetworkTransport
         {
             Assert.IsNotNull(_platform);
 
+            SessionState = SessionState.Starting;
+
             if (Config.NetworkMode == TashiNetworkMode.TashiRelay)
             {
-                if (_state == State.WaitingForTashiRelay)
-                {
-                    Debug.Log("Still waiting for a Tashi Relay allocation");
-                    return;
-                }
-
                 // Important: populate TCE's address book before we try to create the Relay session.
                 _platform?.SetAddressBook(_addressBook);
-                
+
                 Debug.Log($"Requesting a Tashi Relay allocation");
-                _state = State.WaitingForTashiRelay;
 
                 _platform?.CreateRelaySession(
                     Config.TashiRelayBaseUrl,
@@ -478,7 +546,8 @@ namespace Tashi.NetworkTransport
                     e =>
                     {
                         Debug.LogException(e);
-                        _state = State.WaitingForSessionDetails;
+                        SessionState = SessionState.NotStarted;
+                        _beginSessionSucceeded = false;
                     }
                 );
 
@@ -497,6 +566,11 @@ namespace Tashi.NetworkTransport
             {
                 if (tashiRelay is not null)
                 {
+                    // This is set so late so that clients can continually call
+                    // `StartSession` until the host shared the Tashi Relay
+                    // address book entry.
+                    SessionState = SessionState.Starting;
+
                     Debug.Log($"Tashi Relay is now available: {tashiRelay}");
                     AddAddressBookEntry(tashiRelay, false);
                     CompleteSessionSetup();
@@ -509,6 +583,7 @@ namespace Tashi.NetworkTransport
                 return;
             }
 
+            SessionState = SessionState.Starting;
             CompleteSessionSetup();
         }
 
@@ -520,15 +595,18 @@ namespace Tashi.NetworkTransport
             {
                 // FIXME: Handle re-initializing _platform if we need to call tce_start again.
 
+                SessionState = SessionState.InProgress;
                 _platform?.Start(_addressBook);
-                _state = State.Running;
 
                 // TAS-76
                 _platform?.Send(Encoding.ASCII.GetBytes("Hi"));
+
+                _beginSessionSucceeded = true;
             }
             catch (Exception e)
             {
-                _state = State.WaitingForSessionDetails;
+                SessionState = SessionState.NotStarted;
+                _beginSessionSucceeded = false;
                 Debug.LogException(e);
             }
         }
